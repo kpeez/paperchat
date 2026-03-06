@@ -12,7 +12,7 @@ from pymilvus import (
     MilvusClient,
 )
 
-from paperchat.core.embeddings import SUPPORTED_EMBEDDING_MODELS, get_embedding_model
+from paperchat.core.embeddings import get_embedding_model
 
 from ..utils.logging import get_component_logger
 from .ingestion import (
@@ -45,7 +45,7 @@ class VectorStore:
     def __init__(
         self,
         db_path: str = VECTOR_DB_DIR,
-        model_identifier: str = "milvus/all-MiniLM-L6-v2",  # Default fallback model
+        model_identifier: str = "pymilvus/default",
     ):
         """
         Initializes the VectorStore, connects to Milvus, determines the correct
@@ -53,37 +53,37 @@ class VectorStore:
         model-specific data collection and the shared metadata collection exist.
         """
         self.db_path = db_path
-        # collection_name is now dynamic
-        self.metadata_collection_name = self.METADATA_COLLECTION_NAME
         self.model_identifier = model_identifier
         self.logger = get_component_logger("VectorStore")
-
-        # Determine dynamic collection name
-        sanitized_suffix = sanitize_model_identifier(self.model_identifier)
-        self.collection_name = f"paperchat_docs_{sanitized_suffix}"
-        self.logger.info(f"Using data collection: {self.collection_name}")
-        self.logger.info(f"Using metadata collection: {self.metadata_collection_name}")
 
         try:
             self.logger.info(f"Loading embedding model: {model_identifier}")
             self._embed_fn = get_embedding_model(model_identifier)
+            self.embedding_dim = self._embed_fn.dim
+            self.logger.info(f"Using embedding dimension from _embed_fn.dim: {self.embedding_dim}")
 
-            # Get dimension directly from config for reliability
-            if model_identifier not in SUPPORTED_EMBEDDING_MODELS:
-                # This should ideally be caught by get_embedding_model, but double-check
-                raise ValueError(
-                    f"Internal Error: Config missing for validated model {model_identifier}"
-                )
-            self.embedding_dim = SUPPORTED_EMBEDDING_MODELS[model_identifier]["dimensions"]
-            if not isinstance(self.embedding_dim, int) or self.embedding_dim <= 0:
-                raise ValueError(
-                    f"Invalid embedding dimension {self.embedding_dim} for model {model_identifier}"
-                )
-            self.logger.info(f"Using embedding dimension: {self.embedding_dim}")
-
-        except (ValueError, RuntimeError) as e:
-            self.logger.exception(f"Failed to load embedding model '{model_identifier}': {e}")
+        except (
+            ValueError,
+            RuntimeError,
+            AttributeError,
+        ) as e:
+            self.logger.exception(
+                f"Failed to load embedding model '{model_identifier}' or get its dimension: {e}"
+            )
             raise
+
+        if self.model_identifier == "pymilvus/default":
+            sanitized_suffix = sanitize_model_identifier(self._embed_fn.model_name)
+            self.logger.info(
+                f"Default model resolved to: '{self._embed_fn.model_name}'. Using sanitized name for collection suffix."
+            )
+        else:
+            sanitized_suffix = sanitize_model_identifier(self.model_identifier)
+        self.collection_name = f"paperchat_docs_{sanitized_suffix}"
+        self.logger.info(f"Using data collection: {self.collection_name}")
+
+        self.metadata_collection_name = self.METADATA_COLLECTION_NAME
+        self.logger.info(f"Using metadata collection: {self.metadata_collection_name}")
 
         try:
             self.client = MilvusClient(uri=self.db_path)
@@ -94,11 +94,9 @@ class VectorStore:
 
         self.main_schema = self._define_main_schema()
         self.metadata_schema = self._define_metadata_schema()
-        # Ensure model-specific data collection exists
         self._get_or_create_collection(self.collection_name, self.main_schema)
-        # Ensure shared metadata collection exists
         self._get_or_create_collection(self.metadata_collection_name, self.metadata_schema)
-        self._build_indices()  # Builds indices on both collections if needed
+        self._build_indices()
 
     def add_document(self, pdf_path: str | Path, source_id: str, max_tokens: int = 1024) -> bool:
         """
@@ -208,7 +206,6 @@ class VectorStore:
             Returns an empty list if no results are found or an error occurs.
         """
         if output_fields is None:
-            # default: all schema fields except embedding
             output_fields = [f.name for f in self.main_schema.fields if f.name != "embedding"]
 
         try:
@@ -398,8 +395,6 @@ class VectorStore:
                 self.client.create_collection(collection_name=collection_name, schema=schema)
             else:
                 self.logger.info(f"Collection '{collection_name}' already exists.")
-
-            # If it exists and it's the main collection, check dimension compatibility
             if collection_name == self.collection_name:
                 self._check_collection_dimension(collection_name)
 
@@ -423,11 +418,7 @@ class VectorStore:
                         )
                         self.logger.critical(error_msg)
                         raise ValueError(error_msg)
-                    else:
-                        self.logger.info(
-                            f"Existing collection '{collection_name}' dimension ({existing_dim}) matches model dimension ({self.embedding_dim})."
-                        )
-                        return  # Found the embedding field
+                    return  # Found the embedding field
             self.logger.warning(
                 f"Could not find 'embedding' field in existing collection '{collection_name}' description."
             )
@@ -488,8 +479,7 @@ def sanitize_model_identifier(model_identifier: str) -> str:
         return "default_model"
     if not re.match(r"^[a-zA-Z_]", sanitized):
         sanitized = "_" + sanitized
-    # Milvus char limit for collection names is 255
-    max_len = 200
+    max_len = 200  # Milvus char limit for collection names is 255
     if len(sanitized) > max_len:
         sanitized = sanitized[:max_len]
 

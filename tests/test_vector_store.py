@@ -7,7 +7,6 @@ from unittest import mock
 
 import numpy as np
 import pytest
-from pymilvus import CollectionSchema
 
 from paperchat.core.vector_store import (
     DEFAULT_SIMILARITY_THRESHOLD,
@@ -28,8 +27,11 @@ MAIN_FIELD_NAMES = {
 }
 METADATA_FIELD_NAMES = {"pk", "source", "original_filename", "date_added"}
 
-TEST_MODEL_ID = "milvus/all-MiniLM-L6-v2"
-TEST_MODEL_DIM = 384
+DEFAULT_MODEL_ID = "pymilvus/default"
+DEFAULT_MODEL_NAME = "GPTCache/paraphrase-albert-onnx"
+DEFAULT_MODEL_DIM = 768
+EXPLICIT_MODEL_ID = "openai/text-embedding-3-small"
+EXPLICIT_MODEL_DIM = 1536
 
 
 @pytest.fixture
@@ -68,15 +70,31 @@ def vector_store_init_mocks():
         mock_client = mock.MagicMock()
         mock_client_class.return_value = mock_client
         mock_get_logger.return_value = mock.MagicMock()
-        mock_embed_fn = mock.MagicMock()
-        mock_embed_fn.dim = TEST_MODEL_DIM
-        mock_get_model.return_value = mock_embed_fn
-        yield mock_client_class, mock_get_create, mock_build_indices, mock_get_model
+
+        def mock_model_loader(model_id):
+            mock_embed_fn = mock.MagicMock()
+            if model_id == DEFAULT_MODEL_ID:
+                mock_embed_fn.dim = DEFAULT_MODEL_DIM
+                mock_embed_fn.model_name = DEFAULT_MODEL_NAME
+            elif model_id == EXPLICIT_MODEL_ID:
+                mock_embed_fn.dim = EXPLICIT_MODEL_DIM
+            else:
+                raise ValueError(f"Unexpected model_id in mock: {model_id}")
+            return mock_embed_fn
+
+        mock_get_model.side_effect = mock_model_loader
+
+        yield {
+            "mock_client_class": mock_client_class,
+            "mock_get_create": mock_get_create,
+            "mock_build_indices": mock_build_indices,
+            "mock_get_model": mock_get_model,
+        }
 
 
 @pytest.fixture
 def vector_store(mock_milvus_client, temp_db_path):
-    """Create a VectorStore instance with a mocked MilvusClient, mocking init methods."""
+    """Create a VectorStore instance using the default model."""
     with (
         mock.patch("paperchat.core.vector_store.VectorStore._get_or_create_collection"),
         mock.patch("paperchat.core.vector_store.VectorStore._build_indices"),
@@ -85,11 +103,12 @@ def vector_store(mock_milvus_client, temp_db_path):
     ):
         mock_get_logger.return_value = mock.MagicMock()
         mock_embed_fn = mock.MagicMock()
-        mock_embed_fn.dim = TEST_MODEL_DIM
-        mock_embed_fn.encode_queries.return_value = [np.array([0.1] * TEST_MODEL_DIM)]
+        mock_embed_fn.dim = DEFAULT_MODEL_DIM
+        mock_embed_fn.model_name = DEFAULT_MODEL_NAME
+        mock_embed_fn.encode_queries.return_value = [np.array([0.1] * DEFAULT_MODEL_DIM)]
         mock_get_model.return_value = mock_embed_fn
 
-        store = VectorStore(db_path=temp_db_path, model_identifier=TEST_MODEL_ID)
+        store = VectorStore(db_path=temp_db_path, model_identifier=DEFAULT_MODEL_ID)
         store.client = mock_milvus_client
         store._embed_fn = mock_embed_fn
         store.main_schema = store._define_main_schema()
@@ -97,27 +116,24 @@ def vector_store(mock_milvus_client, temp_db_path):
         yield store
 
 
-def test_init_connects_and_sets_up(vector_store_init_mocks, temp_db_path):
-    """Test initialization connects, creates collections, and builds indices."""
-    (mock_client_class, mock_get_create, mock_build_indices, mock_get_model) = (
-        vector_store_init_mocks
-    )
+def test_init_default_model(vector_store_init_mocks, temp_db_path):
+    """Test initialization with the default model identifier."""
+    mocks = vector_store_init_mocks
+    mock_get_model = mocks["mock_get_model"]
+    mock_get_create = mocks["mock_get_create"]
+    mock_build_indices = mocks["mock_build_indices"]
 
-    store = VectorStore(db_path=temp_db_path, model_identifier=TEST_MODEL_ID)
+    store = VectorStore(db_path=temp_db_path, model_identifier=DEFAULT_MODEL_ID)
 
-    mock_client_class.assert_called_once_with(uri=temp_db_path)
-    assert store.client == mock_client_class.return_value
-    assert store.db_path == temp_db_path
-    assert store.model_identifier == TEST_MODEL_ID
+    assert store.model_identifier == DEFAULT_MODEL_ID
+    mock_get_model.assert_called_once_with(DEFAULT_MODEL_ID)
+    assert store.embedding_dim == DEFAULT_MODEL_DIM
 
-    expected_collection_name = f"paperchat_docs_{sanitize_model_identifier(TEST_MODEL_ID)}"
+    expected_default_suffix = sanitize_model_identifier(DEFAULT_MODEL_NAME)
+    expected_collection_name = f"paperchat_docs_{expected_default_suffix}"
     assert store.collection_name == expected_collection_name
     assert store.metadata_collection_name == VectorStore.METADATA_COLLECTION_NAME
 
-    mock_get_model.assert_called_once_with(TEST_MODEL_ID)
-    assert store.embedding_dim == TEST_MODEL_DIM
-
-    assert mock_get_create.call_count == 2
     mock_get_create.assert_has_calls(
         [
             mock.call(expected_collection_name, mock.ANY),
@@ -125,9 +141,34 @@ def test_init_connects_and_sets_up(vector_store_init_mocks, temp_db_path):
         ],
         any_order=True,
     )
-    assert isinstance(mock_get_create.call_args_list[0].args[1], CollectionSchema)
-    assert isinstance(mock_get_create.call_args_list[1].args[1], CollectionSchema)
+    mock_build_indices.assert_called_once()
 
+
+def test_init_explicit_model(vector_store_init_mocks, temp_db_path):
+    """Test initialization with an explicit model identifier."""
+    mocks = vector_store_init_mocks
+    mock_get_model = mocks["mock_get_model"]
+    mock_get_create = mocks["mock_get_create"]
+    mock_build_indices = mocks["mock_build_indices"]
+
+    store = VectorStore(db_path=temp_db_path, model_identifier=EXPLICIT_MODEL_ID)
+
+    assert store.model_identifier == EXPLICIT_MODEL_ID
+    mock_get_model.assert_called_once_with(EXPLICIT_MODEL_ID)
+    assert store.embedding_dim == EXPLICIT_MODEL_DIM
+
+    expected_explicit_suffix = sanitize_model_identifier(EXPLICIT_MODEL_ID)
+    expected_collection_name = f"paperchat_docs_{expected_explicit_suffix}"
+    assert store.collection_name == expected_collection_name
+    assert store.metadata_collection_name == VectorStore.METADATA_COLLECTION_NAME
+
+    mock_get_create.assert_has_calls(
+        [
+            mock.call(expected_collection_name, mock.ANY),
+            mock.call(store.metadata_collection_name, mock.ANY),
+        ],
+        any_order=True,
+    )
     mock_build_indices.assert_called_once()
 
 

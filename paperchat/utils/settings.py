@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Any
 
 from paperchat.core.embeddings import SUPPORTED_EMBEDDING_MODELS
-from paperchat.utils.config import EMBEDDING_MODEL as DEFAULT_EMBEDDING_MODEL
 
 from .logging import get_component_logger
 
+DEFAULT_EMBEDDING_MODEL = "pymilvus/default"
 SETTINGS_DIR = Path.home() / ".paperchat"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 EMBEDDING_MODEL_SETTING_KEY = "embedding_model_identifier"

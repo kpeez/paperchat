@@ -2,7 +2,6 @@ import torch
 
 from .api_keys import get_api_key
 
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 DEVICE = "auto"
 
 

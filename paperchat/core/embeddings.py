@@ -1,21 +1,16 @@
 """Load text embedding models from Milvus"""
 
-import logging
 from typing import Any
 
 from pymilvus.model import DefaultEmbeddingFunction, dense
 
 from paperchat.utils.api_keys import get_api_key
+from paperchat.utils.logging import get_component_logger
 
-logger = logging.getLogger(__name__)
+logger = get_component_logger("embeddings")
 
 PROVIDERS_REQUIRING_KEYS = {"openai", "gemini"}
 SUPPORTED_EMBEDDING_MODELS = {
-    "milvus/all-MiniLM-L6-v2": {
-        "class": DefaultEmbeddingFunction,
-        "init_args": {},
-        "dimensions": 384,
-    },
     "openai/text-embedding-3-small": {
         "class": dense.OpenAIEmbeddingFunction,
         "init_args": {"model_name": "text-embedding-3-small"},
@@ -75,6 +70,28 @@ def get_embedding_model(model_identifier: str) -> Any:
     Returns:
         An initialized embedding function instance from pymilvus.model.
     """
+    if model_identifier == "pymilvus/default":
+        try:
+            logger.info(
+                "[get_embedding_model] Using generic default. Instantiating DefaultEmbeddingFunction()"
+            )
+            embedding_function = DefaultEmbeddingFunction()
+            if not (
+                hasattr(embedding_function, "dim")
+                and isinstance(embedding_function.dim, int)
+                and embedding_function.dim > 0
+            ):
+                raise AttributeError(
+                    "DefaultEmbeddingFunction instance lacks a valid .dim attribute."
+                )
+            logger.info(
+                f"[get_embedding_model] Successfully instantiated pymilvus default: {type(embedding_function)} with dim {embedding_function.dim}"
+            )
+            return embedding_function
+        except Exception as e:
+            logger.error(f"Error instantiating DefaultEmbeddingFunction: {e!s}", exc_info=True)
+            raise RuntimeError("Failed to instantiate the pymilvus default embedding model.") from e
+
     if "/" not in model_identifier:
         raise ValueError(
             f"Invalid model identifier format: '{model_identifier}'. Expected 'provider/model_name'."
@@ -103,6 +120,7 @@ def get_embedding_model(model_identifier: str) -> Any:
 
     try:
         embedding_function = model_class(**init_args)
+
         return embedding_function
 
     except Exception as e:
