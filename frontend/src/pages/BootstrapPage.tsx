@@ -17,13 +17,16 @@ export function BootstrapPage() {
 
   useEffect(() => {
     let cancelled = false;
+    let connected = false;
 
-    const poll = setInterval(async () => {
+    async function check() {
       try {
-        await fetchHealth();
-        if (cancelled) return;
-        clearInterval(poll);
-        setPhase("checking");
+        if (!connected) {
+          await fetchHealth();
+          if (cancelled) return;
+          connected = true;
+          setPhase("checking");
+        }
 
         const data = await fetchBootstrap();
         if (cancelled) return;
@@ -39,7 +42,9 @@ export function BootstrapPage() {
       } catch {
         // Backend not ready yet, keep polling
       }
-    }, 1000);
+    }
+
+    const poll = setInterval(check, 1000);
 
     return () => {
       cancelled = true;
