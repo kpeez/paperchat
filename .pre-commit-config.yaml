@@ -16,6 +16,6 @@ repos:
     rev: "v0.15.1"
     hooks:
       - id: ruff
-        args: [--exit-non-zero-on-fix, --config=pyproject.toml]
+        args: [--exit-non-zero-on-fix, --config=backend/pyproject.toml]
       - id: ruff-format
-        args: [--config=pyproject.toml]
+        args: [--config=backend/pyproject.toml]

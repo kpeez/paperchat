@@ -1,0 +1,65 @@
+[project]
+name = "paperchat-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+]
+
+[project.scripts]
+paperchat-backend = "paperchat_backend.main:run"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "httpx",
+    "ruff>=0.11.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle
+  "W",
+  "F",   # pyflakes
+  "PL",  # pylint
+  "I",   # isort
+  "B",   # flake8-bugbear
+  "SIM", # flake8-simplify
+  "C4",  # flake8-comprehensions
+  "RUF", # ruff
+]
+fixable = ["ALL"]
+ignore = [
+  "RUF001",
+  "PLR0913",
+  "PLR0914",
+  "PLR0917",
+  "PLR2004",
+  "PLW2901",
+  "E501",
+  "B008",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["paperchat_backend"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401", "D104"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
