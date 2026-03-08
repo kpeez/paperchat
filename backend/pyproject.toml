@@ -3,7 +3,10 @@ name = "paperchat-backend"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.16.5",
     "fastapi",
+    "psycopg[binary]>=3.2.12",
+    "sqlalchemy>=2.0.44",
     "uvicorn[standard]",
 ]
 
@@ -15,6 +18,7 @@ dev = [
     "pytest>=8.3.4",
     "httpx",
     "ruff>=0.11.0",
+    "ty>=0.0.20",
 ]
 
 [build-system]
