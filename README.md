@@ -1,55 +1,56 @@
-<p align="center">
-  <img src="docs/assets/logo.png" width="500" alt="PaperChat logo">
-</p>
+# PaperChat
 
----
+PaperChat is a local web app for grounded chat over user-owned PDFs.
 
-Paperchat is an AI-powered assistant that helps you take your research to the next level by enabling you to chat with your research library.
+The live code paths are:
 
-## Installation
+- `frontend/` for the React app
+- `backend/` for the local Python API
+- `compose.yaml` for the local Postgres + `pgvector` runtime
 
-The easiest and fastest way to install PaperChat is using [uv](https://github.com/astral-sh/uv):
+## Local Development
 
-```bash
-uv tool install git+https://github.com/kpeez/paperchat.git
-```
-
-This will install PaperChat and make it available as a command-line tool.
-
-To launch PaperChat, run:
+Start the database:
 
 ```bash
-paperchat
+./scripts/postgres-up.sh
 ```
 
-Alternatively, you can install PaperChat into your Python environment (requires Python 3.12 or newer):
+Start the backend:
 
 ```bash
-pip install git+https://github.com/kpeez/paperchat.git
+cd backend
+uv sync --locked --group dev
+uv run alembic upgrade head
+uv run paperchat-backend
 ```
 
-and then launch PaperChat by running:
+Start the frontend in a second shell:
 
 ```bash
-paperchat
+cd frontend
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-## Quick Start
+## Verification
 
-1. Launch PaperChat: `paperchat`
-2. Upload a PDF document using the sidebar
-3. Wait for processing to complete
-4. Start asking questions about your document!
+Backend:
 
-## Settings
+```bash
+cd backend
+uv run ruff check
+uv run ruff format --check
+uv run ty check
+uv run pytest
+```
 
-PaperChat uses your own model API keys to connect to the AI providers. If you have API keys set as environment variables, they will be automatically detected. Otherwise, you can set them in the settings page. To get API keys, you can sign up for a free account on the providers' websites:
+Frontend:
 
-- [Gemini](https://aistudio.google.com/apikey) (recommended)
-  - This is the recommend provider since you can access models for free (e.g., `gemini-2.5-pro-exp-03-25` and `gemini-2.0-flash`), and their text-embedding model is currently the best available on the [MTEB leaderboard](https://huggingface.co/spaces/mteb/leaderboard).
-- [OpenAI](https://platform.openai.com/api-keys)
-- [Anthropic](https://console.anthropic.com/settings/keys)
+```bash
+cd frontend
+pnpm lint
+pnpm build
+```
 
-## Troubleshooting
-
-- Report issues on our [GitHub Issues page](https://github.com/kpeez/paperchat/issues)
+Runtime details are documented in [`docs/local-runtime.md`](docs/local-runtime.md).

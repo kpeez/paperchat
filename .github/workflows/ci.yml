@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@v6
+
+      - name: Set Up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set Up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint Frontend
+        working-directory: frontend
+        run: pnpm lint
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: pnpm build
+
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PAPERCHAT_DATABASE_URL: postgresql+psycopg://paperchat:paperchat@127.0.0.1:5433/paperchat
+
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@v6
+
+      - name: Set Up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install Backend Dependencies
+        working-directory: backend
+        run: uv sync --locked --group dev
+
+      - name: Validate Compose Configuration
+        run: docker compose -f compose.yaml config
+
+      - name: Start Local Postgres Runtime
+        run: ./scripts/postgres-up.sh
+
+      - name: Apply Backend Migrations
+        working-directory: backend
+        run: uv run alembic upgrade head
+
+      - name: Lint Backend
+        working-directory: backend
+        run: uv run ruff check
+
+      - name: Check Backend Formatting
+        working-directory: backend
+        run: uv run ruff format --check
+
+      - name: Type Check Backend
+        working-directory: backend
+        run: uv run ty check
+
+      - name: Test Backend
+        working-directory: backend
+        run: uv run pytest
+
+      - name: Show Postgres Logs On Failure
+        if: failure()
+        run: docker compose -f compose.yaml logs postgres
+
+      - name: Stop Local Postgres Runtime
+        if: always()
+        run: docker compose -f compose.yaml down -v

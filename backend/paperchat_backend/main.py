@@ -1,4 +1,5 @@
 import os
+from typing import Any, cast
 
 import uvicorn
 from fastapi import FastAPI
@@ -10,7 +11,7 @@ from paperchat_backend.api.bootstrap import router
 def create_app() -> FastAPI:
     app = FastAPI()
     app.add_middleware(
-        CORSMiddleware,
+        cast(Any, CORSMiddleware),
         allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
         allow_credentials=True,
         allow_methods=["*"],
