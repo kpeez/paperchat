@@ -9,15 +9,16 @@ specs
 *.so
 
 # Python files #
-/evaluation/data*
-/evaluation/results*
 .env
 .venv
+backend/.venv
 dist
 build
 *.whl
 *.pytest_cache
 __pycache__
+frontend/dist
+frontend/node_modules
 
 # OS generated files #
 ######################
