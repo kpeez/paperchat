@@ -12,10 +12,17 @@ repos:
       - id: check-merge-conflict
       - id: check-executables-have-shebangs
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.15.1"
+  - repo: local
     hooks:
       - id: ruff
-        args: [--exit-non-zero-on-fix, --config=backend/pyproject.toml]
+        name: ruff (legacy alias)
+        entry: /bin/zsh -lc 'cd backend && uv run ruff check'
+        language: system
+        files: ^backend/
+        pass_filenames: false
       - id: ruff-format
-        args: [--config=backend/pyproject.toml]
+        name: ruff format
+        entry: /bin/zsh -lc 'cd backend && uv run ruff format --check'
+        language: system
+        files: ^backend/
+        pass_filenames: false
