@@ -1,9 +1,9 @@
 """Create the initial backend database schema."""
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
 from paperchat_backend.db.schema import (
     DOCUMENT_STATUS_LENGTH,
     MESSAGE_ROLE_LENGTH,
