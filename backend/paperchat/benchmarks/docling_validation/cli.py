@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from paperchat_backend.benchmarks.docling_validation.runner import (
+from paperchat.benchmarks.docling_validation.runner import (
     DEFAULT_FIXTURES_PATH,
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_QUERIES_PATH,

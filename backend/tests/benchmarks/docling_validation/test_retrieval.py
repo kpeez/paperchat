@@ -1,5 +1,5 @@
-from paperchat_backend.benchmarks.docling_validation.models import NormalizedChunk
-from paperchat_backend.benchmarks.docling_validation.retrieval import (
+from paperchat.benchmarks.docling_validation.models import NormalizedChunk
+from paperchat.benchmarks.docling_validation.retrieval import (
     cosine_similarity,
     rank_chunks,
     term_frequencies,

@@ -10,8 +10,8 @@ from alembic.util.exc import CommandError
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from paperchat_backend import __version__
-from paperchat_backend.config import (
+from paperchat import __version__
+from paperchat.config import (
     ALEMBIC_DIR,
     ALEMBIC_INI_PATH,
     COMPOSE_FILE,
@@ -19,8 +19,8 @@ from paperchat_backend.config import (
     DOCKER_SERVICE,
     get_database_url,
 )
-from paperchat_backend.db.engine import get_engine
-from paperchat_backend.models.bootstrap import (
+from paperchat.db.engine import get_engine
+from paperchat.models.bootstrap import (
     BootstrapError,
     BootstrapResponse,
     BootstrapStatus,

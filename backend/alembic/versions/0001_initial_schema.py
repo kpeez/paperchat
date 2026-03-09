@@ -4,7 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 from alembic import op
-from paperchat_backend.db.schema import (
+from paperchat.db.schema import (
     DOCUMENT_STATUS_LENGTH,
     MESSAGE_ROLE_LENGTH,
     Vector,

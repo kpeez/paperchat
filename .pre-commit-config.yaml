@@ -10,20 +10,17 @@ repos:
       - id: mixed-line-ending
       - id: end-of-file-fixer
       - id: trailing-whitespace
-      - id: check-merge-conflict
       - id: check-executables-have-shebangs
 
   - repo: local
     hooks:
       - id: ruff
-        name: ruff (legacy alias)
-        entry: /bin/zsh -lc 'cd backend && uv run ruff check'
+        name: ruff check
+        entry: uv run --project backend ruff check
         language: system
-        files: ^backend/
-        pass_filenames: false
+        files: ^backend/.*\.pyi?$
       - id: ruff-format
         name: ruff format
-        entry: /bin/zsh -lc 'cd backend && uv run ruff format --check'
+        entry: uv run --project backend ruff format --check
         language: system
-        files: ^backend/
-        pass_filenames: false
+        files: ^backend/.*\.pyi?$

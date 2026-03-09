@@ -4,7 +4,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Final
 
-from paperchat_backend.benchmarks.docling_validation.models import NormalizedChunk
+from paperchat.benchmarks.docling_validation.models import NormalizedChunk
 
 TOKEN_PATTERN: Final[re.Pattern[str]] = re.compile(r"[a-z0-9]+")
 

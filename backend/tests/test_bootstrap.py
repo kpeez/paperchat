@@ -3,9 +3,9 @@ from typing import Any, cast
 import pytest
 from fastapi.testclient import TestClient
 
-from paperchat_backend.main import create_app
-from paperchat_backend.models.bootstrap import CheckResult
-from paperchat_backend.services import bootstrap as bootstrap_service
+from paperchat.main import create_app
+from paperchat.models.bootstrap import CheckResult
+from paperchat.services import bootstrap as bootstrap_service
 
 client = TestClient(create_app())
 

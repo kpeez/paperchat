@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from paperchat_backend.benchmarks.docling_validation.manifests import (
+from paperchat.benchmarks.docling_validation.manifests import (
     load_fixture_documents,
     load_gold_queries,
 )
