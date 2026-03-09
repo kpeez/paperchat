@@ -1,0 +1,128 @@
+[
+  {
+    "query_id": "attention_scaled_dot_product",
+    "doc_id": "attention_is_all_you_need",
+    "query": "Why does the transformer divide attention scores by sqrt d_k?",
+    "expected_pages": [4],
+    "expected_headings": ["3.2.1 Scaled Dot-Product Attention"]
+  },
+  {
+    "query_id": "attention_self_attention_speed",
+    "doc_id": "attention_is_all_you_need",
+    "query": "Why is self-attention faster than recurrent or convolutional layers?",
+    "expected_pages": [6],
+    "expected_headings": ["4 Why Self-Attention"]
+  },
+  {
+    "query_id": "attention_label_smoothing",
+    "doc_id": "attention_is_all_you_need",
+    "query": "What label smoothing value was used to regularize the transformer?",
+    "expected_pages": [8],
+    "expected_headings": ["5.4 Regularization"]
+  },
+  {
+    "query_id": "bert_pretraining_steps",
+    "doc_id": "bert_pretraining",
+    "query": "What are the two steps in BERT: pre-training and fine-tuning?",
+    "expected_pages": [3],
+    "expected_headings": ["3 BERT"]
+  },
+  {
+    "query_id": "bert_glue_score",
+    "doc_id": "bert_pretraining",
+    "query": "What GLUE score does BERT reach?",
+    "expected_pages": [5, 6],
+    "expected_headings": ["4.1 GLUE"]
+  },
+  {
+    "query_id": "bert_squad_v2",
+    "doc_id": "bert_pretraining",
+    "query": "What does the SQuAD 2.0 task add compared with SQuAD 1.1?",
+    "expected_pages": [7],
+    "expected_headings": ["4.3 SQuAD v2.0"]
+  },
+  {
+    "query_id": "resnet_residual_formulation",
+    "doc_id": "deep_residual_learning",
+    "query": "What is the residual learning formulation F(x) + x?",
+    "expected_pages": [3],
+    "expected_headings": ["3.1. Residual Learning"]
+  },
+  {
+    "query_id": "resnet_shortcut_projection",
+    "doc_id": "deep_residual_learning",
+    "query": "When dimensions increase, how does the shortcut use a linear projection W_s?",
+    "expected_pages": [3],
+    "expected_headings": ["3.2. Identity Mapping by Shortcuts"]
+  },
+  {
+    "query_id": "resnet_imagenet_top5",
+    "doc_id": "deep_residual_learning",
+    "query": "What top-5 error does ResNet-152 achieve on ImageNet?",
+    "expected_pages": [6],
+    "expected_headings": ["4.1. ImageNet Classification"]
+  },
+  {
+    "query_id": "vaeb_reparameterization",
+    "doc_id": "auto_encoding_variational_bayes",
+    "query": "What is the deterministic variable z = g_phi(epsilon, x) in the reparameterization trick?",
+    "expected_pages": [4],
+    "expected_headings": ["2.4 The reparameterization trick"]
+  },
+  {
+    "query_id": "vaeb_problem_scenario",
+    "doc_id": "auto_encoding_variational_bayes",
+    "query": "What three related problems are listed in the problem scenario section?",
+    "expected_pages": [2],
+    "expected_headings": ["2.1 Problem scenario"]
+  },
+  {
+    "query_id": "vaeb_experiment_datasets",
+    "doc_id": "auto_encoding_variational_bayes",
+    "query": "Which image datasets, including MNIST and Frey Face, are used in the variational auto-encoder experiments?",
+    "expected_pages": [6, 7],
+    "expected_headings": ["5 Experiments"]
+  },
+  {
+    "query_id": "seq2seq_reversing_source",
+    "doc_id": "sequence_to_sequence_learning",
+    "query": "What short-term dependencies are introduced by reversing the source sentences?",
+    "expected_pages": [4, 5],
+    "expected_headings": ["3.3 Reversing the Source Sentences"]
+  },
+  {
+    "query_id": "seq2seq_bleu_score",
+    "doc_id": "sequence_to_sequence_learning",
+    "query": "What BLEU score is obtained by an ensemble of 5 deep LSTMs on WMT 2014 English to French?",
+    "expected_pages": [2, 6],
+    "expected_headings": ["1 Introduction", "3.6 Experimental Results"]
+  },
+  {
+    "query_id": "seq2seq_long_sentences",
+    "doc_id": "sequence_to_sequence_learning",
+    "query": "What does section 3.7 report about performance on long sentences?",
+    "expected_pages": [6],
+    "expected_headings": ["3.7 Performance on long sentences"]
+  },
+  {
+    "query_id": "layer_norm_batch_norm_drawbacks",
+    "doc_id": "layer_normalization",
+    "query": "What drawbacks of batch normalization does layer normalization address?",
+    "expected_pages": [2],
+    "expected_headings": ["3 Layer normalization"]
+  },
+  {
+    "query_id": "layer_norm_invariance_table",
+    "doc_id": "layer_normalization",
+    "query": "What does Table 1 say about invariance under weight and data transformations?",
+    "expected_pages": [3, 4],
+    "expected_headings": ["5.1 Invariance under weights and data transformations"]
+  },
+  {
+    "query_id": "layer_norm_skip_thoughts",
+    "doc_id": "layer_normalization",
+    "query": "What do the skip-thought vector experiments show with and without layer normalization?",
+    "expected_pages": [8, 9],
+    "expected_headings": ["6.3 Skip-thought vectors"]
+  }
+]
