@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.16.5",
+    "docling>=2.0.0",
     "fastapi",
     "psycopg[binary]>=3.2.12",
     "sqlalchemy>=2.0.44",
@@ -12,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 paperchat-backend = "paperchat_backend.main:run"
+paperchat-docling-validation = "paperchat_backend.benchmarks.docling_validation.cli:main"
 
 [dependency-groups]
 dev = [
