@@ -6,7 +6,17 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -14,7 +24,16 @@ from sqlalchemy.sql import expression
 from sqlalchemy.types import UserDefinedType
 
 DOCUMENT_STATUS_LENGTH = 32
+INGESTION_JOB_STATUS_LENGTH = 32
+INGESTION_STAGE_LENGTH = 32
+INGESTION_ERROR_CODE_LENGTH = 64
 MESSAGE_ROLE_LENGTH = 16
+PARSER_ID_LENGTH = 64
+CHUNKER_ID_LENGTH = 64
+EMBEDDING_MODEL_ID_LENGTH = 128
+
+DOCUMENT_STATUSES = ("pending", "processing", "ready", "failed")
+INGESTION_JOB_STATUSES = ("queued", "running", "succeeded", "failed")
 
 
 class Base(DeclarativeBase):
@@ -47,6 +66,7 @@ class TimestampMixin:
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
+        onupdate=func.now(),
     )
 
 
@@ -69,8 +89,34 @@ class Document(TimestampMixin, Base):
         nullable=False,
         server_default=expression.text("'pending'"),
     )
+    parser_id: Mapped[str | None] = mapped_column(String(PARSER_ID_LENGTH), nullable=True)
+    chunker_id: Mapped[str | None] = mapped_column(String(CHUNKER_ID_LENGTH), nullable=True)
+    embedding_model_id: Mapped[str | None] = mapped_column(
+        String(EMBEDDING_MODEL_ID_LENGTH),
+        nullable=True,
+    )
+    chunk_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=expression.text("0"),
+    )
+    error_code: Mapped[str | None] = mapped_column(
+        String(INGESTION_ERROR_CODE_LENGTH),
+        nullable=True,
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    __table_args__ = (Index("ix_documents_status", "status"),)
+    __table_args__ = (
+        Index("ix_documents_status", "status"),
+        CheckConstraint(
+            "content_hash ~ '^[0-9a-f]{64}$'",
+            name="ck_documents_content_hash_sha256",
+        ),
+        CheckConstraint(
+            f"status IN {DOCUMENT_STATUSES}",
+            name="ck_documents_status_valid",
+        ),
+    )
 
 
 class DocumentChunk(Base):
@@ -90,8 +136,10 @@ class DocumentChunk(Base):
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    retrieval_text: Mapped[str] = mapped_column(Text, nullable=False)
     page_numbers: Mapped[list[int]] = mapped_column(ARRAY(Integer()), nullable=False)
     headings: Mapped[list[str]] = mapped_column(ARRAY(Text()), nullable=False)
+    warning_codes: Mapped[list[str]] = mapped_column(ARRAY(Text()), nullable=False)
     embedding: Mapped[Any] = mapped_column(Vector(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -107,6 +155,59 @@ class DocumentChunk(Base):
         ),
         Index("ix_document_chunks_document_id", "document_id"),
     )
+
+
+class IngestionJob(TimestampMixin, Base):
+    """Document ingestion attempt tracking."""
+
+    __tablename__ = "ingestion_jobs"
+
+    id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        primary_key=True,
+        server_default=expression.text("gen_random_uuid()"),
+    )
+    document_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(INGESTION_JOB_STATUS_LENGTH),
+        nullable=False,
+        server_default=expression.text("'queued'"),
+    )
+    stage: Mapped[str] = mapped_column(
+        String(INGESTION_STAGE_LENGTH),
+        nullable=False,
+        server_default=expression.text("'queued'"),
+    )
+    error_code: Mapped[str | None] = mapped_column(
+        String(INGESTION_ERROR_CODE_LENGTH),
+        nullable=True,
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "document_id",
+            "attempt",
+            name="uq_ingestion_jobs_document_id_attempt",
+        ),
+        Index("ix_ingestion_jobs_document_id", "document_id"),
+        Index("ix_ingestion_jobs_status", "status"),
+        CheckConstraint(
+            f"status IN {INGESTION_JOB_STATUSES}",
+            name="ck_ingestion_jobs_status_valid",
+        ),
+    )
+
+    @property
+    def attempt_number(self) -> int:
+        return self.attempt
 
 
 class Conversation(TimestampMixin, Base):

@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from paperchat_backend.benchmarks.docling_validation.models import FixtureDocument, GoldQuery
+from paperchat.benchmarks.docling_validation.models import FixtureDocument, GoldQuery
 
 
 def load_fixture_documents(path: Path) -> tuple[FixtureDocument, ...]:

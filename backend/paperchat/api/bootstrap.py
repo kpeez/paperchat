@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-from paperchat_backend.models.bootstrap import BootstrapResponse, HealthResponse
-from paperchat_backend.services import build_bootstrap_response
+from paperchat.models.bootstrap import BootstrapResponse, HealthResponse
+from paperchat.services import build_bootstrap_response
 
 router = APIRouter()
 

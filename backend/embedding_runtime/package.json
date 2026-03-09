@@ -1,0 +1,8 @@
+{
+  "name": "paperchat-embedding-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "node-llama-cpp": "^3.17.1"
+  }
+}

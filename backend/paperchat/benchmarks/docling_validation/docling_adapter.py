@@ -7,12 +7,13 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any, TypeVar
 
-from paperchat_backend.benchmarks.docling_validation.models import (
+from paperchat.benchmarks.docling_validation.models import (
     ChunkerRun,
     FixtureDocument,
     FixtureRun,
     NormalizedChunk,
 )
+from paperchat.config import get_huggingface_cache_dir
 
 T = TypeVar("T")
 SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
@@ -241,8 +242,9 @@ def _find_cached_sentence_transformer_snapshot() -> Path | None:
 def _hugging_face_roots() -> tuple[Path, ...]:
     raw_roots = [
         os.environ.get("HF_HOME"),
+        os.environ.get("HF_HUB_CACHE"),
         os.environ.get("HUGGINGFACE_HUB_CACHE"),
-        str(Path.home() / ".cache" / "huggingface"),
+        str(get_huggingface_cache_dir()),
     ]
 
     roots: list[Path] = []

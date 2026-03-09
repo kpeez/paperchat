@@ -8,7 +8,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from paperchat_backend.db.schema import Base
+from paperchat.db.schema import Base
 
 config = context.config
 

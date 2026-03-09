@@ -4,12 +4,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from statistics import mean
 
-from paperchat_backend.benchmarks.docling_validation.docling_adapter import run_docling_fixture
-from paperchat_backend.benchmarks.docling_validation.manifests import (
+from paperchat.benchmarks.docling_validation.docling_adapter import run_docling_fixture
+from paperchat.benchmarks.docling_validation.manifests import (
     load_fixture_documents,
     load_gold_queries,
 )
-from paperchat_backend.benchmarks.docling_validation.models import (
+from paperchat.benchmarks.docling_validation.models import (
     BenchmarkRun,
     ChunkerSummary,
     FixtureRun,
@@ -17,8 +17,8 @@ from paperchat_backend.benchmarks.docling_validation.models import (
     QuerySummary,
     Recommendation,
 )
-from paperchat_backend.benchmarks.docling_validation.retrieval import rank_chunks
-from paperchat_backend.config import BACKEND_ROOT
+from paperchat.benchmarks.docling_validation.retrieval import rank_chunks
+from paperchat.config import BACKEND_ROOT
 
 DEFAULT_FIXTURE_ROOT = BACKEND_ROOT / "tests" / "fixtures" / "docling_validation"
 DEFAULT_FIXTURES_PATH = DEFAULT_FIXTURE_ROOT / "fixtures.json"

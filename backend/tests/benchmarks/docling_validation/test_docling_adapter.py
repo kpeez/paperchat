@@ -1,7 +1,8 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from paperchat_backend.benchmarks.docling_validation import docling_adapter
+from paperchat import config as paperchat_config
+from paperchat.benchmarks.docling_validation import docling_adapter
 
 
 def test_find_cached_sentence_transformer_snapshot_from_hf_home(
@@ -16,18 +17,19 @@ def test_find_cached_sentence_transformer_snapshot_from_hf_home(
         (snapshot_path / filename).write_text("x", encoding="utf-8")
 
     monkeypatch.setenv("HF_HOME", str(tmp_path))
+    monkeypatch.delenv("HF_HUB_CACHE", raising=False)
     monkeypatch.delenv("HUGGINGFACE_HUB_CACHE", raising=False)
 
     assert docling_adapter._find_cached_sentence_transformer_snapshot() == snapshot_path
 
 
-def test_find_cached_sentence_transformer_snapshot_uses_default_home_cache(
+def test_find_cached_sentence_transformer_snapshot_uses_default_paperchat_cache(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
     snapshot_path = (
         tmp_path
-        / ".cache"
+        / "paperchat-cache"
         / "huggingface"
         / "models--sentence-transformers--all-MiniLM-L6-v2"
         / "snapshots"
@@ -38,8 +40,31 @@ def test_find_cached_sentence_transformer_snapshot_uses_default_home_cache(
         (snapshot_path / filename).write_text("x", encoding="utf-8")
 
     monkeypatch.delenv("HF_HOME", raising=False)
+    monkeypatch.delenv("HF_HUB_CACHE", raising=False)
     monkeypatch.delenv("HUGGINGFACE_HUB_CACHE", raising=False)
-    monkeypatch.setattr(docling_adapter.Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("PAPERCHAT_CACHE_DIR", str(tmp_path / "paperchat-cache"))
+    paperchat_config.get_cache_dir.cache_clear()
+    paperchat_config.get_huggingface_cache_dir.cache_clear()
+
+    assert docling_adapter._find_cached_sentence_transformer_snapshot() == snapshot_path
+    paperchat_config.get_cache_dir.cache_clear()
+    paperchat_config.get_huggingface_cache_dir.cache_clear()
+
+
+def test_find_cached_sentence_transformer_snapshot_from_hf_hub_cache(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    snapshot_path = (
+        tmp_path / "models--sentence-transformers--all-MiniLM-L6-v2" / "snapshots" / "snapshot-1"
+    )
+    snapshot_path.mkdir(parents=True)
+    for filename in ("tokenizer.json", "tokenizer_config.json", "vocab.txt"):
+        (snapshot_path / filename).write_text("x", encoding="utf-8")
+
+    monkeypatch.delenv("HF_HOME", raising=False)
+    monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path))
+    monkeypatch.delenv("HUGGINGFACE_HUB_CACHE", raising=False)
 
     assert docling_adapter._find_cached_sentence_transformer_snapshot() == snapshot_path
 

@@ -9,6 +9,8 @@ DEFAULT_DB_NAME = "paperchat"
 DEFAULT_DB_PASSWORD = "paperchat"
 DEFAULT_DB_PORT = 5433
 DEFAULT_DB_USER = "paperchat"
+DEFAULT_EMBEDDING_MODEL = "hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf"
+DEFAULT_CACHE_DIR = Path.home() / ".cache" / "paperchat"
 DOCKER_BINARY = "docker"
 DOCKER_SERVICE = "postgres"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -43,3 +45,32 @@ def get_database_url() -> str:
         port=_read_port("PAPERCHAT_DB_PORT", DEFAULT_DB_PORT),
         database=os.getenv("PAPERCHAT_DB_NAME", DEFAULT_DB_NAME),
     ).render_as_string(hide_password=False)
+
+
+@lru_cache
+def get_embedding_model_name() -> str:
+    return os.getenv("PAPERCHAT_EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+
+
+@lru_cache
+def get_cache_dir() -> Path:
+    raw_cache_dir = os.getenv("PAPERCHAT_CACHE_DIR")
+    if raw_cache_dir:
+        return Path(raw_cache_dir).expanduser()
+    return DEFAULT_CACHE_DIR
+
+
+@lru_cache
+def get_huggingface_cache_dir() -> Path:
+    raw_hf_cache_dir = os.getenv("PAPERCHAT_HF_CACHE_DIR")
+    if raw_hf_cache_dir:
+        return Path(raw_hf_cache_dir).expanduser()
+    return get_cache_dir() / "huggingface"
+
+
+@lru_cache
+def get_model_cache_dir() -> Path:
+    raw_model_cache_dir = os.getenv("PAPERCHAT_MODEL_CACHE_DIR")
+    if raw_model_cache_dir:
+        return Path(raw_model_cache_dir).expanduser()
+    return get_cache_dir() / "models"

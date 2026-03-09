@@ -1,11 +1,12 @@
 """Database schema package for the PaperChat backend."""
 
-from paperchat_backend.db.schema import (
+from paperchat.db.schema import (
     AppState,
     Base,
     Conversation,
     Document,
     DocumentChunk,
+    IngestionJob,
     Message,
     Vector,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "Conversation",
     "Document",
     "DocumentChunk",
+    "IngestionJob",
     "Message",
     "Vector",
 ]

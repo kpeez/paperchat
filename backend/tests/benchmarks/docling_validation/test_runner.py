@@ -3,12 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from paperchat_backend.benchmarks.docling_validation.models import (
+from paperchat.benchmarks.docling_validation.models import (
     ChunkerRun,
     FixtureRun,
     NormalizedChunk,
 )
-from paperchat_backend.benchmarks.docling_validation.runner import run_validation
+from paperchat.benchmarks.docling_validation.runner import run_validation
 
 
 def write_json(path: Path, payload: object) -> None:
@@ -108,7 +108,7 @@ def test_run_validation_prefers_chunker_with_better_support_hits(
         )
 
     monkeypatch.setattr(
-        "paperchat_backend.benchmarks.docling_validation.runner.run_docling_fixture",
+        "paperchat.benchmarks.docling_validation.runner.run_docling_fixture",
         fake_run_docling_fixture,
     )
 
@@ -159,7 +159,7 @@ def test_run_validation_blocks_when_docling_parse_fails(
     )
 
     monkeypatch.setattr(
-        "paperchat_backend.benchmarks.docling_validation.runner.run_docling_fixture",
+        "paperchat.benchmarks.docling_validation.runner.run_docling_fixture",
         lambda _fixture: FixtureRun(
             doc_id="doc-1",
             title="Sample Paper",

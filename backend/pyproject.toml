@@ -12,8 +12,8 @@ dependencies = [
 ]
 
 [project.scripts]
-paperchat-backend = "paperchat_backend.main:run"
-paperchat-docling-validation = "paperchat_backend.benchmarks.docling_validation.cli:main"
+paperchat-backend = "paperchat.main:run"
+paperchat-docling-validation = "paperchat.benchmarks.docling_validation.cli:main"
 
 [dependency-groups]
 dev = [
@@ -59,7 +59,10 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["paperchat_backend"]
+known-first-party = ["paperchat"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["paperchat"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402", "F401", "D104"]
