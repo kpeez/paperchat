@@ -1,0 +1,38 @@
+[
+  {
+    "doc_id": "attention_is_all_you_need",
+    "title": "Attention Is All You Need",
+    "pdf": "attention-is-all-you-need.pdf",
+    "traits": ["two-column", "equations", "tables"]
+  },
+  {
+    "doc_id": "bert_pretraining",
+    "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+    "pdf": "bert-pretraining.pdf",
+    "traits": ["two-column", "messy-front-matter", "long-references"]
+  },
+  {
+    "doc_id": "deep_residual_learning",
+    "title": "Deep Residual Learning for Image Recognition",
+    "pdf": "deep-residual-learning.pdf",
+    "traits": ["two-column", "figures", "tables"]
+  },
+  {
+    "doc_id": "auto_encoding_variational_bayes",
+    "title": "Auto-Encoding Variational Bayes",
+    "pdf": "auto-encoding-variational-bayes.pdf",
+    "traits": ["two-column", "equations", "figures"]
+  },
+  {
+    "doc_id": "sequence_to_sequence_learning",
+    "title": "Sequence to Sequence Learning with Neural Networks",
+    "pdf": "sequence-to-sequence-learning.pdf",
+    "traits": ["two-column", "tables", "long-references"]
+  },
+  {
+    "doc_id": "layer_normalization",
+    "title": "Layer Normalization",
+    "pdf": "layer-normalization.pdf",
+    "traits": ["two-column", "equations", "short-paper"]
+  }
+]
