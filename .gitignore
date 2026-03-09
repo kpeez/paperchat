@@ -19,6 +19,7 @@ build
 __pycache__
 frontend/dist
 frontend/node_modules
+backend/embedding_runtime/node_modules
 
 # OS generated files #
 ######################
