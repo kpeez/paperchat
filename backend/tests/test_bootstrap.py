@@ -15,37 +15,29 @@ def make_check(name: str, *, ok: bool, message: str) -> bootstrap_service.Comple
 
 
 DEFAULT_READY_CHECKS = {
-    "docker": make_check("docker", ok=True, message="Docker runtime is ready."),
-    "database": make_check("database", ok=True, message="Connected to Postgres."),
+    "database": make_check("database", ok=True, message="Connected to SQLite."),
     "migrations": make_check(
         "migrations",
         ok=True,
         message="Migration revision 0001_initial_schema is current.",
     ),
-    "pgvector": make_check("pgvector", ok=True, message="pgvector extension 0.8.1 is installed."),
+    "sqlite_vec": make_check("sqlite_vec", ok=True, message="sqlite-vec 0.1.6 is loaded."),
 }
 
 
 def patch_bootstrap_checks(
     monkeypatch: pytest.MonkeyPatch,
     *,
-    docker: bootstrap_service.CompletedCheck | None = None,
     database: bootstrap_service.CompletedCheck | None = None,
     migrations: bootstrap_service.CompletedCheck | None = None,
-    pgvector: bootstrap_service.CompletedCheck | None = None,
+    sqlite_vec: bootstrap_service.CompletedCheck | None = None,
 ) -> None:
     checks = {
         **DEFAULT_READY_CHECKS,
-        "docker": docker or DEFAULT_READY_CHECKS["docker"],
         "database": database or DEFAULT_READY_CHECKS["database"],
         "migrations": migrations or DEFAULT_READY_CHECKS["migrations"],
-        "pgvector": pgvector or DEFAULT_READY_CHECKS["pgvector"],
+        "sqlite_vec": sqlite_vec or DEFAULT_READY_CHECKS["sqlite_vec"],
     }
-    monkeypatch.setattr(
-        bootstrap_service,
-        "_check_docker_runtime",
-        lambda: checks["docker"],
-    )
     monkeypatch.setattr(
         bootstrap_service,
         "_check_database",
@@ -58,8 +50,8 @@ def patch_bootstrap_checks(
     )
     monkeypatch.setattr(
         bootstrap_service,
-        "_check_pgvector",
-        lambda: checks["pgvector"],
+        "_check_sqlite_vec",
+        lambda: checks["sqlite_vec"],
     )
 
 
@@ -97,24 +89,13 @@ def test_status_is_ready(monkeypatch: pytest.MonkeyPatch):
 
 def test_all_expected_checks_present(monkeypatch: pytest.MonkeyPatch):
     data = get_bootstrap_data(monkeypatch)
-    expected = {"backend", "database", "docker", "migrations", "pgvector"}
+    expected = {"backend", "database", "migrations", "sqlite_vec"}
     assert set(data["checks"].keys()) == expected
 
 
 @pytest.mark.parametrize(
     ("check_patch", "expected_checks", "expected_errors"),
     [
-        (
-            {"docker": make_check("docker", ok=False, message="Docker is unavailable")},
-            {
-                "docker": {"ok": False, "message": "Docker is unavailable"},
-            },
-            {
-                "code": "docker_failed",
-                "message": "Docker is unavailable",
-                "action": bootstrap_service.CHECK_ACTIONS["docker"],
-            },
-        ),
         (
             {
                 "database": make_check(
@@ -129,7 +110,7 @@ def test_all_expected_checks_present(monkeypatch: pytest.MonkeyPatch):
                     "ok": False,
                     "message": bootstrap_service.DATABASE_BLOCKED_MESSAGE,
                 },
-                "pgvector": {
+                "sqlite_vec": {
                     "ok": False,
                     "message": bootstrap_service.DATABASE_BLOCKED_MESSAGE,
                 },
@@ -153,19 +134,19 @@ def test_all_expected_checks_present(monkeypatch: pytest.MonkeyPatch):
         ),
         (
             {
-                "pgvector": make_check(
-                    "pgvector",
+                "sqlite_vec": make_check(
+                    "sqlite_vec",
                     ok=False,
-                    message="pgvector extension is missing",
+                    message="sqlite-vec extension did not load.",
                 )
             },
             {
-                "pgvector": {"ok": False, "message": "pgvector extension is missing"},
+                "sqlite_vec": {"ok": False, "message": "sqlite-vec extension did not load."},
             },
             {
-                "code": "pgvector_failed",
-                "message": "pgvector extension is missing",
-                "action": bootstrap_service.CHECK_ACTIONS["pgvector"],
+                "code": "sqlite_vec_failed",
+                "message": "sqlite-vec extension did not load.",
+                "action": bootstrap_service.CHECK_ACTIONS["sqlite_vec"],
             },
         ),
     ],

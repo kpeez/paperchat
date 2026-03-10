@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from hashlib import sha256
 from pathlib import Path
-from uuid import UUID
 
 from paperchat.db.schema import Document, DocumentChunk, IngestionJob
 from paperchat.repositories.document_registry import DocumentRegistryRepository
@@ -15,9 +14,9 @@ from paperchat.services.ingestion_parsing import IngestionChunk, ParseResult
 
 class FakeCoordinator:
     def __init__(self) -> None:
-        self.job_ids: list[UUID] = []
+        self.job_ids: list[str] = []
 
-    def enqueue(self, job_id: UUID) -> None:
+    def enqueue(self, job_id: str) -> None:
         self.job_ids.append(job_id)
 
 
@@ -25,7 +24,7 @@ class FakeParser:
     def __init__(self, *, error: str | None = None) -> None:
         self.error = error
 
-    def parse_document(self, *, document_id: UUID, pdf_path: Path) -> ParseResult:
+    def parse_document(self, *, document_id: str, pdf_path: Path) -> ParseResult:
         del document_id
         if self.error is not None:
             return ParseResult(
