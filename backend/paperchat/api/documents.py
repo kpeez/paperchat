@@ -88,7 +88,7 @@ def list_documents(request: Request) -> DocumentListResponse:
 @router.get("/{document_id}", response_model=DocumentResponse)
 def get_document(document_id: UUID, request: Request) -> DocumentResponse:
     service = _get_document_service(request)
-    document = service.get_document(document_id=document_id)
+    document = service.get_document(document_id=str(document_id))
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
     return _to_document_response(document)
@@ -97,7 +97,7 @@ def get_document(document_id: UUID, request: Request) -> DocumentResponse:
 @router.post("/{document_id}/retry", response_model=DocumentMutationResponse)
 def retry_document(document_id: UUID, request: Request) -> DocumentMutationResponse:
     service = _get_document_service(request)
-    result = service.retry_document(document_id=document_id)
+    result = service.retry_document(document_id=str(document_id))
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
     return _to_mutation_response(result)
@@ -106,7 +106,7 @@ def retry_document(document_id: UUID, request: Request) -> DocumentMutationRespo
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(document_id: UUID, request: Request) -> Response:
     service = _get_document_service(request)
-    deleted = service.delete_document(document_id=document_id)
+    deleted = service.delete_document(document_id=str(document_id))
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

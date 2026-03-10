@@ -1,5 +1,4 @@
 from enum import StrEnum
-from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -23,8 +22,8 @@ class DocumentImportRequest(BaseModel):
 
 
 class IngestionJobResponse(BaseModel):
-    id: UUID
-    document_id: UUID
+    id: str
+    document_id: str
     attempt_number: int
     status: IngestionJobStatus
     stage: str | None = None
@@ -33,7 +32,7 @@ class IngestionJobResponse(BaseModel):
 
 
 class DocumentResponse(BaseModel):
-    id: UUID
+    id: str
     content_hash: str
     original_filename: str
     display_name: str
