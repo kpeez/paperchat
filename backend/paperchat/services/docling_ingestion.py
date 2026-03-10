@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Protocol, TypeVar
-from uuid import UUID
 
 T = TypeVar("T")
 SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
@@ -18,7 +17,7 @@ DOCLING_CHUNKER_ID = "hierarchical"
 
 @dataclass(frozen=True, slots=True)
 class ParsedChunk:
-    document_id: UUID
+    document_id: str
     chunk_index: int
     text: str
     retrieval_text: str
@@ -62,13 +61,13 @@ class DoclingParseError(RuntimeError):
 
 
 class DocumentParser(Protocol):
-    def parse_document(self, *, document_id: UUID, pdf_path: Path) -> ParsedDocument: ...
+    def parse_document(self, *, document_id: str, pdf_path: Path) -> ParsedDocument: ...
 
 
 class DoclingDocumentParser:
     """Production Docling parser using DocumentConverter and HierarchicalChunker."""
 
-    def parse_document(self, *, document_id: UUID, pdf_path: Path) -> ParsedDocument:
+    def parse_document(self, *, document_id: str, pdf_path: Path) -> ParsedDocument:
         result = run_docling_parse(pdf_path=pdf_path)
         if not result.parser_ok:
             raise DoclingParseError(result.error or "Docling parsing failed.")
