@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from uuid import UUID
 
 from paperchat.services.docling_ingestion import run_docling_parse
 
@@ -37,7 +36,7 @@ class DoclingParser:
         self,
         *,
         pdf_path: Path,
-        document_id: UUID | None = None,
+        document_id: str | None = None,
     ) -> ParseResult:
         result = run_docling_parse(pdf_path=pdf_path)
         chunks = tuple(

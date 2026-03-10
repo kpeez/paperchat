@@ -1,7 +1,6 @@
-"""Expand the document registry for PR 4 ingestion."""
+"""Expand the document registry for ingestion tracking."""
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 from alembic import op
 from paperchat.db.schema import (
@@ -20,91 +19,64 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "documents",
-        sa.Column("parser_id", sa.String(length=PARSER_ID_LENGTH), nullable=True),
-    )
-    op.add_column(
-        "documents",
-        sa.Column("chunker_id", sa.String(length=CHUNKER_ID_LENGTH), nullable=True),
-    )
-    op.add_column(
-        "documents",
-        sa.Column(
-            "embedding_model_id",
-            sa.String(length=EMBEDDING_MODEL_ID_LENGTH),
-            nullable=True,
-        ),
-    )
-    op.add_column(
-        "documents",
-        sa.Column(
-            "chunk_count",
-            sa.Integer(),
-            nullable=False,
-            server_default=sa.text("0"),
-        ),
-    )
-    op.add_column(
-        "documents",
-        sa.Column(
-            "error_code",
-            sa.String(length=INGESTION_ERROR_CODE_LENGTH),
-            nullable=True,
-        ),
-    )
-    op.add_column(
-        "documents",
-        sa.Column("error_message", sa.Text(), nullable=True),
-    )
-    op.create_check_constraint(
-        "ck_documents_content_hash_sha256",
-        "documents",
-        "content_hash ~ '^[0-9a-f]{64}$'",
-    )
-    op.create_check_constraint(
-        "ck_documents_status_valid",
-        "documents",
-        "status IN ('pending', 'processing', 'ready', 'failed')",
-    )
+    with op.batch_alter_table("documents") as batch_op:
+        batch_op.add_column(
+            sa.Column("parser_id", sa.String(length=PARSER_ID_LENGTH), nullable=True)
+        )
+        batch_op.add_column(
+            sa.Column("chunker_id", sa.String(length=CHUNKER_ID_LENGTH), nullable=True)
+        )
+        batch_op.add_column(
+            sa.Column(
+                "embedding_model_id",
+                sa.String(length=EMBEDDING_MODEL_ID_LENGTH),
+                nullable=True,
+            )
+        )
+        batch_op.add_column(
+            sa.Column("chunk_count", sa.Integer(), nullable=False, server_default="0")
+        )
+        batch_op.add_column(
+            sa.Column(
+                "error_code",
+                sa.String(length=INGESTION_ERROR_CODE_LENGTH),
+                nullable=True,
+            )
+        )
+        batch_op.add_column(sa.Column("error_message", sa.Text(), nullable=True))
+        batch_op.create_check_constraint(
+            "ck_documents_content_hash_sha256",
+            "length(content_hash) = 64 AND content_hash NOT GLOB '*[^0-9a-f]*'",
+        )
+        batch_op.create_check_constraint(
+            "ck_documents_status_valid",
+            "status IN ('pending', 'processing', 'ready', 'failed')",
+        )
 
-    op.add_column(
-        "document_chunks",
-        sa.Column("retrieval_text", sa.Text(), nullable=False, server_default=""),
-    )
-    op.add_column(
-        "document_chunks",
-        sa.Column(
-            "warning_codes",
-            postgresql.ARRAY(sa.Text()),
-            nullable=False,
-            server_default=sa.text("'{}'::text[]"),
-        ),
-    )
-    op.alter_column("document_chunks", "retrieval_text", server_default=None)
-    op.alter_column("document_chunks", "warning_codes", server_default=None)
+    with op.batch_alter_table("document_chunks") as batch_op:
+        batch_op.add_column(
+            sa.Column("retrieval_text", sa.Text(), nullable=False, server_default="")
+        )
+        batch_op.add_column(
+            sa.Column("warning_codes", sa.JSON(), nullable=False, server_default="[]")
+        )
 
     op.create_table(
         "ingestion_jobs",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            nullable=False,
-            server_default=sa.text("gen_random_uuid()"),
-        ),
-        sa.Column("document_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(length=36), nullable=False),
+        sa.Column("document_id", sa.String(length=36), nullable=False),
         sa.Column("attempt", sa.Integer(), nullable=False),
         sa.Column(
             "status",
             sa.String(length=INGESTION_JOB_STATUS_LENGTH),
             nullable=False,
-            server_default=sa.text("'queued'"),
+            server_default="queued",
         ),
         sa.Column(
             "stage",
             sa.String(length=INGESTION_STAGE_LENGTH),
             nullable=False,
-            server_default=sa.text("'queued'"),
+            server_default="queued",
         ),
         sa.Column(
             "error_code",
@@ -112,17 +84,17 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("error_message", sa.Text(), nullable=True),
-        sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("started_at", sa.DateTime(), nullable=True),
+        sa.Column("finished_at", sa.DateTime(), nullable=True),
         sa.Column(
             "created_at",
-            sa.DateTime(timezone=True),
+            sa.DateTime(),
             nullable=False,
             server_default=sa.func.now(),
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(timezone=True),
+            sa.DateTime(),
             nullable=False,
             server_default=sa.func.now(),
         ),
@@ -149,14 +121,16 @@ def downgrade() -> None:
     op.drop_index("ix_ingestion_jobs_document_id", table_name="ingestion_jobs")
     op.drop_table("ingestion_jobs")
 
-    op.drop_column("document_chunks", "warning_codes")
-    op.drop_column("document_chunks", "retrieval_text")
+    with op.batch_alter_table("document_chunks") as batch_op:
+        batch_op.drop_column("warning_codes")
+        batch_op.drop_column("retrieval_text")
 
-    op.drop_constraint("ck_documents_status_valid", "documents", type_="check")
-    op.drop_constraint("ck_documents_content_hash_sha256", "documents", type_="check")
-    op.drop_column("documents", "error_message")
-    op.drop_column("documents", "error_code")
-    op.drop_column("documents", "chunk_count")
-    op.drop_column("documents", "embedding_model_id")
-    op.drop_column("documents", "chunker_id")
-    op.drop_column("documents", "parser_id")
+    with op.batch_alter_table("documents") as batch_op:
+        batch_op.drop_constraint("ck_documents_status_valid", type_="check")
+        batch_op.drop_constraint("ck_documents_content_hash_sha256", type_="check")
+        batch_op.drop_column("error_message")
+        batch_op.drop_column("error_code")
+        batch_op.drop_column("chunk_count")
+        batch_op.drop_column("embedding_model_id")
+        batch_op.drop_column("chunker_id")
+        batch_op.drop_column("parser_id")

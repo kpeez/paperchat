@@ -1,38 +1,33 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from uuid import uuid4
 
 import pytest
-from sqlalchemy import Engine, create_engine, text
+import sqlite_vec
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
-from paperchat.config import get_database_url
 from paperchat.db.schema import Base
+
+
+def _configure_test_connection(dbapi_conn, _connection_record):
+    dbapi_conn.execute("PRAGMA foreign_keys=ON")
+    dbapi_conn.enable_load_extension(True)
+    sqlite_vec.load(dbapi_conn)
+    dbapi_conn.enable_load_extension(False)
 
 
 @pytest.fixture(scope="session")
 def database_engine() -> Generator[Engine]:
-    schema_name = f"paperchat_test_{uuid4().hex}"
-    admin_engine = create_engine(get_database_url(), pool_pre_ping=True)
-    with admin_engine.begin() as connection:
-        connection.execute(text(f'CREATE SCHEMA "{schema_name}"'))
-        connection.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto"))
-        connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-
     engine = create_engine(
-        get_database_url(),
-        pool_pre_ping=True,
-        connect_args={"options": f"-csearch_path={schema_name},public"},
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
-
-    try:
-        yield engine
-    finally:
-        engine.dispose()
-        with admin_engine.begin() as connection:
-            connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
-        admin_engine.dispose()
+    event.listen(engine, "connect", _configure_test_connection)
+    yield engine
+    engine.dispose()
 
 
 @pytest.fixture

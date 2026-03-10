@@ -7,7 +7,6 @@ from pathlib import Path
 from queue import Empty, Queue
 from threading import Event, Thread
 from typing import Any, Protocol
-from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -24,7 +23,7 @@ class IngestionError:
 
 
 class DocumentParserProtocol(Protocol):
-    def parse_document(self, *, document_id: UUID, pdf_path: Path) -> Any: ...
+    def parse_document(self, *, document_id: str, pdf_path: Path) -> Any: ...
 
 
 class EmbeddingServiceProtocol(Protocol):
@@ -48,7 +47,7 @@ class IngestionProcessor:
         self._parser = parser
         self._embedder = embedder
 
-    def process(self, job_id: UUID) -> None:
+    def process(self, job_id: str) -> None:
         document_id, file_path = self._mark_job_running(job_id)
         if document_id is None or file_path is None:
             return
@@ -69,7 +68,7 @@ class IngestionProcessor:
         except Exception as error:
             self._persist_failure(job_id=job_id, error=_classify_error(error))
 
-    def _mark_job_running(self, job_id: UUID) -> tuple[UUID | None, str | None]:
+    def _mark_job_running(self, job_id: str) -> tuple[str | None, str | None]:
         with self._session_factory.begin() as session:
             jobs = IngestionJobRepository(session)
             documents = DocumentRepository(session)
@@ -87,7 +86,7 @@ class IngestionProcessor:
             document.error_message = None
             return document.id, document.file_path
 
-    def _update_job_stage(self, job_id: UUID, *, stage: str) -> None:
+    def _update_job_stage(self, job_id: str, *, stage: str) -> None:
         with self._session_factory.begin() as session:
             job = IngestionJobRepository(session).get(job_id)
             if job is None:
@@ -97,7 +96,7 @@ class IngestionProcessor:
     def _persist_success(
         self,
         *,
-        job_id: UUID,
+        job_id: str,
         parsed,
         embeddings: tuple[tuple[float, ...], ...],
     ) -> None:
@@ -137,7 +136,7 @@ class IngestionProcessor:
             job.error_message = None
             job.finished_at = datetime.now(tz=UTC)
 
-    def _persist_failure(self, *, job_id: UUID, error: IngestionError) -> None:
+    def _persist_failure(self, *, job_id: str, error: IngestionError) -> None:
         with self._session_factory.begin() as session:
             jobs = IngestionJobRepository(session)
             documents = DocumentRepository(session)
@@ -167,7 +166,7 @@ class IngestionCoordinator(IngestionCoordinatorProtocol):
 
     def __init__(self, *, processor: IngestionProcessor) -> None:
         self._processor = processor
-        self._queue: Queue[UUID] = Queue()
+        self._queue: Queue[str] = Queue()
         self._stop_event = Event()
         self._thread: Thread | None = None
 
@@ -184,13 +183,13 @@ class IngestionCoordinator(IngestionCoordinatorProtocol):
             self._thread.join(timeout=5)
             self._thread = None
 
-    def enqueue(self, job_id: UUID) -> None:
+    def enqueue(self, job_id: str) -> None:
         self._queue.put(job_id)
 
-    def process_now(self, job_id: UUID) -> None:
+    def process_now(self, job_id: str) -> None:
         self._processor.process(job_id)
 
-    def process_job(self, job_id: UUID) -> None:
+    def process_job(self, job_id: str) -> None:
         self.process_now(job_id)
 
     def _run(self) -> None:

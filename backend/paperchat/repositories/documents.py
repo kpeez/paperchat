@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from uuid import UUID
 
 from sqlalchemy import Select, delete, func, select
 from sqlalchemy.orm import Session
@@ -27,7 +26,7 @@ class DocumentRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def get(self, document_id: UUID) -> Document | None:
+    def get(self, document_id: str) -> Document | None:
         return self._session.get(Document, document_id)
 
     def get_by_content_hash(self, content_hash: str) -> Document | None:
@@ -61,8 +60,8 @@ class DocumentRepository:
             )
         )
 
-    def delete(self, document: Document | UUID) -> None:
-        if isinstance(document, UUID):
+    def delete(self, document: Document | str) -> None:
+        if isinstance(document, str):
             target = self.get(document)
             if target is None:
                 return
@@ -72,7 +71,7 @@ class DocumentRepository:
 
     def replace_chunks(
         self,
-        document_id: UUID,
+        document_id: str,
         chunks: Sequence[DocumentChunk],
     ) -> None:
         self._session.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document_id))
@@ -86,7 +85,7 @@ class DocumentChunkRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def list_for_document(self, document_id: UUID) -> tuple[DocumentChunk, ...]:
+    def list_for_document(self, document_id: str) -> tuple[DocumentChunk, ...]:
         statement = (
             select(DocumentChunk)
             .where(DocumentChunk.document_id == document_id)
@@ -94,7 +93,7 @@ class DocumentChunkRepository:
         )
         return tuple(self._session.scalars(statement))
 
-    def replace_for_document(self, document_id: UUID, chunks: Sequence[NewChunk]) -> None:
+    def replace_for_document(self, document_id: str, chunks: Sequence[NewChunk]) -> None:
         rows = [
             DocumentChunk(
                 document_id=document_id,
@@ -117,10 +116,10 @@ class IngestionJobRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def get(self, job_id: UUID) -> IngestionJob | None:
+    def get(self, job_id: str) -> IngestionJob | None:
         return self._session.get(IngestionJob, job_id)
 
-    def get_latest_for_document(self, document_id: UUID) -> IngestionJob | None:
+    def get_latest_for_document(self, document_id: str) -> IngestionJob | None:
         statement = (
             select(IngestionJob)
             .where(IngestionJob.document_id == document_id)
@@ -132,7 +131,7 @@ class IngestionJobRepository:
         statement = select(IngestionJob).where(IngestionJob.status == "running")
         return tuple(self._session.scalars(statement))
 
-    def next_attempt(self, document_id: UUID) -> int:
+    def next_attempt(self, document_id: str) -> int:
         statement: Select[tuple[int | None]] = select(func.max(IngestionJob.attempt)).where(
             IngestionJob.document_id == document_id
         )
@@ -147,7 +146,7 @@ class IngestionJobRepository:
     def create(
         self,
         *,
-        document_id: UUID,
+        document_id: str,
         status: str = "queued",
         stage: str = "queued",
     ) -> IngestionJob:

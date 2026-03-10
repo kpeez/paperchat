@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
@@ -12,10 +12,10 @@ from paperchat.services.documents import DocumentActionResult, DocumentRecord, I
 
 
 def build_action_result(*, document_status: str, job_enqueued: bool) -> DocumentActionResult:
-    document_id = uuid4()
+    document_id = str(uuid4())
     latest_job = (
         IngestionJobRecord(
-            id=uuid4(),
+            id=str(uuid4()),
             document_id=document_id,
             attempt_number=1,
             status=IngestionJobStatus.queued,
@@ -61,8 +61,8 @@ class FakeDocumentService:
             for result in [*self.import_results, self.retry_result]
         }
         self.import_paths: list[Path] = []
-        self.retry_ids: list[UUID] = []
-        self.delete_ids: list[UUID] = []
+        self.retry_ids: list[str] = []
+        self.delete_ids: list[str] = []
         self.recovery_calls = 0
 
     def import_document(self, *, file_path: Path) -> DocumentActionResult:
@@ -74,14 +74,14 @@ class FakeDocumentService:
     def list_documents(self) -> tuple[DocumentRecord, ...]:
         return tuple(self.documents.values())
 
-    def get_document(self, *, document_id: UUID) -> DocumentRecord | None:
+    def get_document(self, *, document_id: str) -> DocumentRecord | None:
         return self.documents.get(document_id)
 
-    def retry_document(self, *, document_id: UUID) -> DocumentActionResult | None:
+    def retry_document(self, *, document_id: str) -> DocumentActionResult | None:
         self.retry_ids.append(document_id)
         return self.retry_result if document_id in self.documents else None
 
-    def delete_document(self, *, document_id: UUID) -> bool:
+    def delete_document(self, *, document_id: str) -> bool:
         self.delete_ids.append(document_id)
         return self.documents.pop(document_id, None) is not None
 
@@ -122,14 +122,14 @@ def test_document_routes_cover_import_duplicate_retry_delete_and_lifespan_recove
         assert retry_response.status_code == 200
         retry_data = retry_response.json()
         assert retry_data["job_enqueued"] is True
-        assert retry_data["document"]["id"] == str(service.retry_result.document.id)
+        assert retry_data["document"]["id"] == service.retry_result.document.id
 
         delete_response = client.delete(f"/api/documents/{data['document']['id']}")
         assert delete_response.status_code == 204
 
     assert service.import_paths == [Path("/tmp/paper.pdf"), Path("/tmp/duplicate-paper.pdf")]
-    assert service.retry_ids == [UUID(data["document"]["id"])]
-    assert service.delete_ids == [UUID(data["document"]["id"])]
+    assert service.retry_ids == [data["document"]["id"]]
+    assert service.delete_ids == [data["document"]["id"]]
     assert service.recovery_calls == 1
 
 

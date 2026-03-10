@@ -5,7 +5,8 @@ from __future__ import annotations
 import os
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
+import sqlite_vec
+from sqlalchemy import engine_from_config, event, pool
 
 from alembic import context
 from paperchat.db.schema import Base
@@ -30,6 +31,13 @@ def _database_url() -> str:
     return database_url
 
 
+def _configure_sqlite_connection(dbapi_conn, _connection_record):
+    dbapi_conn.execute("PRAGMA foreign_keys=ON")
+    dbapi_conn.enable_load_extension(True)
+    sqlite_vec.load(dbapi_conn)
+    dbapi_conn.enable_load_extension(False)
+
+
 def run_migrations_offline() -> None:
     """Run migrations without creating an Engine."""
     context.configure(
@@ -37,7 +45,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,
-        compare_server_default=True,
+        render_as_batch=True,
         dialect_opts={"paramstyle": "named"},
     )
 
@@ -55,13 +63,14 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    event.listen(connectable, "connect", _configure_sqlite_connection)
 
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
-            compare_server_default=True,
+            render_as_batch=True,
         )
 
         with context.begin_transaction():

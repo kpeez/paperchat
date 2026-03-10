@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
-from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -31,23 +30,23 @@ class DocumentRegistrationResult:
 
 
 class DocumentRegistryRepository:
-    """High-level persistence helpers for PR 4 document registration flows."""
+    """High-level persistence helpers for document registration flows."""
 
     def __init__(self, session: Session) -> None:
         self._session = session
         self._documents = DocumentRepository(session)
         self._jobs = IngestionJobRepository(session)
 
-    def get_document(self, document_id: UUID) -> Document | None:
+    def get_document(self, document_id: str) -> Document | None:
         return self._documents.get(document_id)
 
     def list_documents(self) -> tuple[Document, ...]:
         return self._documents.list_all()
 
-    def get_job(self, job_id: UUID) -> IngestionJob | None:
+    def get_job(self, job_id: str) -> IngestionJob | None:
         return self._jobs.get(job_id)
 
-    def get_latest_job(self, document_id: UUID) -> IngestionJob | None:
+    def get_latest_job(self, document_id: str) -> IngestionJob | None:
         return self._jobs.get_latest_for_document(document_id)
 
     def register_document(
@@ -91,7 +90,7 @@ class DocumentRegistryRepository:
         self._session.commit()
         return DocumentRegistrationResult(mode="existing", document=document, job=latest_job)
 
-    def replace_chunks(self, *, document_id: UUID, chunks: tuple[StoredChunk, ...]) -> None:
+    def replace_chunks(self, *, document_id: str, chunks: tuple[StoredChunk, ...]) -> None:
         rows = [
             DocumentChunk(
                 document_id=document_id,
@@ -107,7 +106,7 @@ class DocumentRegistryRepository:
         ]
         self._documents.replace_chunks(document_id=document_id, chunks=rows)
 
-    def mark_job_running(self, *, job_id: UUID, stage: str) -> IngestionJob:
+    def mark_job_running(self, *, job_id: str, stage: str) -> IngestionJob:
         job = self._require_job(job_id)
         document = self._require_document(job.document_id)
         job.status = "running"
@@ -124,7 +123,7 @@ class DocumentRegistryRepository:
     def mark_job_failed(
         self,
         *,
-        job_id: UUID,
+        job_id: str,
         error_code: str,
         error_message: str,
     ) -> IngestionJob:
@@ -149,7 +148,7 @@ class DocumentRegistryRepository:
     def mark_job_succeeded(
         self,
         *,
-        job_id: UUID,
+        job_id: str,
         parser_id: str,
         chunker_id: str,
         embedding_model_id: str,
@@ -183,12 +182,12 @@ class DocumentRegistryRepository:
             failed += 1
         return failed
 
-    def delete_document(self, document_id: UUID) -> None:
+    def delete_document(self, document_id: str) -> None:
         document = self._require_document(document_id)
         self._documents.delete(document)
         self._session.commit()
 
-    def _create_job(self, *, document_id: UUID) -> IngestionJob:
+    def _create_job(self, *, document_id: str) -> IngestionJob:
         attempt = self._jobs.next_attempt(document_id)
         return self._jobs.add(
             IngestionJob(
@@ -199,14 +198,14 @@ class DocumentRegistryRepository:
             )
         )
 
-    def _require_document(self, document_id: UUID) -> Document:
+    def _require_document(self, document_id: str) -> Document:
         document = self._documents.get(document_id)
         if document is None:
             msg = f"Document {document_id} was not found."
             raise LookupError(msg)
         return document
 
-    def _require_job(self, job_id: UUID) -> IngestionJob:
+    def _require_job(self, job_id: str) -> IngestionJob:
         job = self._jobs.get(job_id)
         if job is None:
             msg = f"Ingestion job {job_id} was not found."
