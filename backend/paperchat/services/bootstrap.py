@@ -1,7 +1,4 @@
-import subprocess
-from collections.abc import Sequence
 from dataclasses import dataclass
-from shutil import which
 
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
@@ -14,9 +11,6 @@ from paperchat import __version__
 from paperchat.config import (
     ALEMBIC_DIR,
     ALEMBIC_INI_PATH,
-    COMPOSE_FILE,
-    DOCKER_BINARY,
-    DOCKER_SERVICE,
     get_database_url,
 )
 from paperchat.db.engine import get_engine
@@ -28,13 +22,11 @@ from paperchat.models.bootstrap import (
 )
 
 CHECK_ACTIONS = {
-    "docker": "Install Docker Desktop and start the local PaperChat database container.",
-    "database": "Start the local Postgres container and confirm the configured port is reachable.",
+    "database": "Confirm the SQLite database path is writable and the file is not corrupt.",
     "migrations": "Run the backend migrations so the database revision matches the application.",
-    "pgvector": "Recreate the local database with the pgvector image or install the vector extension.",
+    "sqlite_vec": "Reinstall the sqlite-vec Python package (pip install sqlite-vec).",
 }
 DATABASE_BLOCKED_MESSAGE = "Database must be reachable before this check can run."
-DOCKER_COMMAND_TIMEOUT_SECONDS = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,14 +42,14 @@ def _completed_check(name: str, *, ok: bool, message: str) -> CompletedCheck:
 def build_bootstrap_response() -> BootstrapResponse:
     checks = {"backend": CheckResult(ok=True, message=f"Backend {__version__} is running.")}
 
-    for check in (_check_docker_runtime(), _check_database()):
-        checks[check.name] = check.result
+    database_check = _check_database()
+    checks[database_check.name] = database_check.result
 
     if checks["database"].ok:
-        for check in (_check_migrations(), _check_pgvector()):
+        for check in (_check_migrations(), _check_sqlite_vec()):
             checks[check.name] = check.result
     else:
-        for name in ("migrations", "pgvector"):
+        for name in ("migrations", "sqlite_vec"):
             checks[name] = CheckResult(ok=False, message=DATABASE_BLOCKED_MESSAGE)
 
     errors = [
@@ -78,37 +70,6 @@ def build_bootstrap_response() -> BootstrapResponse:
     )
 
 
-def _check_docker_runtime() -> CompletedCheck:
-    if not COMPOSE_FILE.is_file():
-        return _completed_check(
-            "docker",
-            ok=False,
-            message=f"Compose file not found at {COMPOSE_FILE}.",
-        )
-
-    docker_binary = which(DOCKER_BINARY)
-    if docker_binary is None:
-        return _completed_check("docker", ok=False, message="Docker CLI is not installed.")
-
-    version_result = _run_docker_command([docker_binary, "compose", "version"])
-    if isinstance(version_result, CompletedCheck):
-        return version_result
-
-    compose_command = [docker_binary, "compose", "-f", str(COMPOSE_FILE)]
-    ps_result = _run_docker_command([*compose_command, "ps", "--services", "--status", "running"])
-    if isinstance(ps_result, CompletedCheck):
-        return ps_result
-
-    if DOCKER_SERVICE not in ps_result.stdout.split():
-        return _completed_check(
-            "docker",
-            ok=False,
-            message=f"Compose service '{DOCKER_SERVICE}' is not running.",
-        )
-
-    return _completed_check("docker", ok=True, message="Docker runtime is ready.")
-
-
 def _check_database() -> CompletedCheck:
     try:
         with get_engine().connect() as connection:
@@ -120,7 +81,7 @@ def _check_database() -> CompletedCheck:
             message=str(error.__cause__ or error),
         )
 
-    return _completed_check("database", ok=True, message="Connected to Postgres.")
+    return _completed_check("database", ok=True, message="Connected to SQLite.")
 
 
 def _check_migrations() -> CompletedCheck:
@@ -164,64 +125,26 @@ def _check_migrations() -> CompletedCheck:
     )
 
 
-def _check_pgvector() -> CompletedCheck:
+def _check_sqlite_vec() -> CompletedCheck:
     try:
         with get_engine().connect() as connection:
-            extension_version = connection.scalar(
-                text("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
-            )
+            version = connection.scalar(text("SELECT vec_version()"))
     except SQLAlchemyError as error:
         return _completed_check(
-            "pgvector",
+            "sqlite_vec",
             ok=False,
             message=str(error.__cause__ or error),
         )
 
-    if extension_version is None:
+    if version is None:
         return _completed_check(
-            "pgvector",
+            "sqlite_vec",
             ok=False,
-            message="pgvector extension is not installed.",
+            message="sqlite-vec extension did not load.",
         )
 
     return _completed_check(
-        "pgvector",
+        "sqlite_vec",
         ok=True,
-        message=f"pgvector extension {extension_version} is installed.",
+        message=f"sqlite-vec {version} is loaded.",
     )
-
-
-def _run_command(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=DOCKER_COMMAND_TIMEOUT_SECONDS,
-    )
-
-
-def _run_docker_command(
-    command: Sequence[str],
-) -> subprocess.CompletedProcess[str] | CompletedCheck:
-    try:
-        result = _run_command(command)
-    except subprocess.TimeoutExpired:
-        return _completed_check("docker", ok=False, message="Docker command timed out.")
-
-    if result.returncode == 0:
-        return result
-
-    return _completed_check(
-        "docker",
-        ok=False,
-        message=_command_error_message(result.stderr, result.stdout),
-    )
-
-
-def _command_error_message(stderr: str, stdout: str) -> str:
-    message = stderr.strip() or stdout.strip()
-    if message:
-        return message
-
-    return "Docker command failed without output."
