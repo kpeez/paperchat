@@ -1,13 +1,11 @@
 """Create the initial backend database schema."""
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 from alembic import op
 from paperchat.db.schema import (
     DOCUMENT_STATUS_LENGTH,
     MESSAGE_ROLE_LENGTH,
-    Vector,
 )
 
 revision = "0001_initial_schema"
@@ -17,17 +15,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
-    op.execute("CREATE EXTENSION IF NOT EXISTS vector")
-
     op.create_table(
         "documents",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            nullable=False,
-            server_default=sa.text("gen_random_uuid()"),
-        ),
+        sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("content_hash", sa.String(length=128), nullable=False),
         sa.Column("original_filename", sa.Text(), nullable=False),
         sa.Column("display_name", sa.Text(), nullable=False),
@@ -36,17 +26,17 @@ def upgrade() -> None:
             "status",
             sa.String(length=DOCUMENT_STATUS_LENGTH),
             nullable=False,
-            server_default=sa.text("'pending'"),
+            server_default="pending",
         ),
         sa.Column(
             "created_at",
-            sa.DateTime(timezone=True),
+            sa.DateTime(),
             nullable=False,
             server_default=sa.func.now(),
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(timezone=True),
+            sa.DateTime(),
             nullable=False,
             server_default=sa.func.now(),
         ),
@@ -57,21 +47,16 @@ def upgrade() -> None:
 
     op.create_table(
         "document_chunks",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            nullable=False,
-            server_default=sa.text("gen_random_uuid()"),
-        ),
-        sa.Column("document_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(length=36), nullable=False),
+        sa.Column("document_id", sa.String(length=36), nullable=False),
         sa.Column("chunk_index", sa.Integer(), nullable=False),
         sa.Column("text", sa.Text(), nullable=False),
-        sa.Column("page_numbers", postgresql.ARRAY(sa.Integer()), nullable=False),
-        sa.Column("headings", postgresql.ARRAY(sa.Text()), nullable=False),
-        sa.Column("embedding", Vector(), nullable=False),
+        sa.Column("page_numbers", sa.JSON(), nullable=False),
+        sa.Column("headings", sa.JSON(), nullable=False),
+        sa.Column("embedding", sa.JSON(), nullable=False),
         sa.Column(
             "created_at",
-            sa.DateTime(timezone=True),
+            sa.DateTime(),
             nullable=False,
             server_default=sa.func.now(),
         ),
@@ -89,22 +74,17 @@ def upgrade() -> None:
 
     op.create_table(
         "conversations",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            nullable=False,
-            server_default=sa.text("gen_random_uuid()"),
-        ),
+        sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("title", sa.Text(), nullable=True),
         sa.Column(
             "created_at",
-            sa.DateTime(timezone=True),
+            sa.DateTime(),
             nullable=False,
             server_default=sa.func.now(),
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(timezone=True),
+            sa.DateTime(),
             nullable=False,
             server_default=sa.func.now(),
         ),
@@ -113,13 +93,8 @@ def upgrade() -> None:
 
     op.create_table(
         "messages",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            nullable=False,
-            server_default=sa.text("gen_random_uuid()"),
-        ),
-        sa.Column("conversation_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(length=36), nullable=False),
+        sa.Column("conversation_id", sa.String(length=36), nullable=False),
         sa.Column("message_index", sa.Integer(), nullable=False),
         sa.Column(
             "role",
@@ -127,10 +102,10 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("content", sa.Text(), nullable=False),
-        sa.Column("citations", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("citations", sa.JSON(), nullable=True),
         sa.Column(
             "created_at",
-            sa.DateTime(timezone=True),
+            sa.DateTime(),
             nullable=False,
             server_default=sa.func.now(),
         ),
@@ -149,13 +124,13 @@ def upgrade() -> None:
         sa.Column("key", sa.String(length=64), nullable=False),
         sa.Column(
             "value",
-            postgresql.JSONB(astext_type=sa.Text()),
+            sa.JSON(),
             nullable=False,
-            server_default=sa.text("'{}'::jsonb"),
+            server_default="{}",
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(timezone=True),
+            sa.DateTime(),
             nullable=False,
             server_default=sa.func.now(),
         ),

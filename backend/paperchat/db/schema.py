@@ -1,10 +1,10 @@
-"""Database schema for the local Postgres persistence contract."""
+"""Database schema for the local SQLite persistence contract."""
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
+from uuid import uuid4
 
 from sqlalchemy import (
     CheckConstraint,
@@ -17,11 +17,8 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.sql import expression
-from sqlalchemy.types import UserDefinedType
+from sqlalchemy.types import JSON
 
 DOCUMENT_STATUS_LENGTH = 32
 INGESTION_JOB_STATUS_LENGTH = 32
@@ -36,37 +33,33 @@ DOCUMENT_STATUSES = ("pending", "processing", "ready", "failed")
 INGESTION_JOB_STATUSES = ("queued", "running", "succeeded", "failed")
 
 
+def _new_uuid() -> str:
+    return str(uuid4())
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
 class Base(DeclarativeBase):
     """Base metadata for backend database tables."""
-
-
-class Vector(UserDefinedType[Any]):
-    """Minimal SQLAlchemy type for pgvector-backed columns."""
-
-    cache_ok = True
-
-    def __init__(self, dimensions: int | None = None) -> None:
-        self.dimensions = dimensions
-
-    def get_col_spec(self, **_: Any) -> str:
-        if self.dimensions is None:
-            return "vector"
-        return f"vector({self.dimensions})"
 
 
 class TimestampMixin:
     """Shared timestamp columns for mutable tables."""
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        DateTime,
         nullable=False,
+        default=_utcnow,
         server_default=func.now(),
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        DateTime,
         nullable=False,
+        default=_utcnow,
         server_default=func.now(),
-        onupdate=func.now(),
+        onupdate=_utcnow,
     )
 
 
@@ -75,10 +68,10 @@ class Document(TimestampMixin, Base):
 
     __tablename__ = "documents"
 
-    id: Mapped[UUID] = mapped_column(
-        PostgresUUID(as_uuid=True),
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        server_default=expression.text("gen_random_uuid()"),
+        default=_new_uuid,
     )
     content_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     original_filename: Mapped[str] = mapped_column(Text, nullable=False)
@@ -87,7 +80,7 @@ class Document(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(
         String(DOCUMENT_STATUS_LENGTH),
         nullable=False,
-        server_default=expression.text("'pending'"),
+        default="pending",
     )
     parser_id: Mapped[str | None] = mapped_column(String(PARSER_ID_LENGTH), nullable=True)
     chunker_id: Mapped[str | None] = mapped_column(String(CHUNKER_ID_LENGTH), nullable=True)
@@ -98,7 +91,7 @@ class Document(TimestampMixin, Base):
     chunk_count: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
-        server_default=expression.text("0"),
+        default=0,
     )
     error_code: Mapped[str | None] = mapped_column(
         String(INGESTION_ERROR_CODE_LENGTH),
@@ -109,7 +102,7 @@ class Document(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_documents_status", "status"),
         CheckConstraint(
-            "content_hash ~ '^[0-9a-f]{64}$'",
+            "length(content_hash) = 64 AND content_hash NOT GLOB '*[^0-9a-f]*'",
             name="ck_documents_content_hash_sha256",
         ),
         CheckConstraint(
@@ -124,26 +117,27 @@ class DocumentChunk(Base):
 
     __tablename__ = "document_chunks"
 
-    id: Mapped[UUID] = mapped_column(
-        PostgresUUID(as_uuid=True),
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        server_default=expression.text("gen_random_uuid()"),
+        default=_new_uuid,
     )
-    document_id: Mapped[UUID] = mapped_column(
-        PostgresUUID(as_uuid=True),
+    document_id: Mapped[str] = mapped_column(
+        String(36),
         ForeignKey("documents.id", ondelete="CASCADE"),
         nullable=False,
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     retrieval_text: Mapped[str] = mapped_column(Text, nullable=False)
-    page_numbers: Mapped[list[int]] = mapped_column(ARRAY(Integer()), nullable=False)
-    headings: Mapped[list[str]] = mapped_column(ARRAY(Text()), nullable=False)
-    warning_codes: Mapped[list[str]] = mapped_column(ARRAY(Text()), nullable=False)
-    embedding: Mapped[Any] = mapped_column(Vector(), nullable=False)
+    page_numbers: Mapped[list[int]] = mapped_column(JSON, nullable=False)
+    headings: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    warning_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        DateTime,
         nullable=False,
+        default=_utcnow,
         server_default=func.now(),
     )
 
@@ -162,13 +156,13 @@ class IngestionJob(TimestampMixin, Base):
 
     __tablename__ = "ingestion_jobs"
 
-    id: Mapped[UUID] = mapped_column(
-        PostgresUUID(as_uuid=True),
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        server_default=expression.text("gen_random_uuid()"),
+        default=_new_uuid,
     )
-    document_id: Mapped[UUID] = mapped_column(
-        PostgresUUID(as_uuid=True),
+    document_id: Mapped[str] = mapped_column(
+        String(36),
         ForeignKey("documents.id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -176,20 +170,20 @@ class IngestionJob(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(
         String(INGESTION_JOB_STATUS_LENGTH),
         nullable=False,
-        server_default=expression.text("'queued'"),
+        default="queued",
     )
     stage: Mapped[str] = mapped_column(
         String(INGESTION_STAGE_LENGTH),
         nullable=False,
-        server_default=expression.text("'queued'"),
+        default="queued",
     )
     error_code: Mapped[str | None] = mapped_column(
         String(INGESTION_ERROR_CODE_LENGTH),
         nullable=True,
     )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     __table_args__ = (
         UniqueConstraint(
@@ -215,10 +209,10 @@ class Conversation(TimestampMixin, Base):
 
     __tablename__ = "conversations"
 
-    id: Mapped[UUID] = mapped_column(
-        PostgresUUID(as_uuid=True),
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        server_default=expression.text("gen_random_uuid()"),
+        default=_new_uuid,
     )
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -228,23 +222,24 @@ class Message(Base):
 
     __tablename__ = "messages"
 
-    id: Mapped[UUID] = mapped_column(
-        PostgresUUID(as_uuid=True),
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        server_default=expression.text("gen_random_uuid()"),
+        default=_new_uuid,
     )
-    conversation_id: Mapped[UUID] = mapped_column(
-        PostgresUUID(as_uuid=True),
+    conversation_id: Mapped[str] = mapped_column(
+        String(36),
         ForeignKey("conversations.id", ondelete="CASCADE"),
         nullable=False,
     )
     message_index: Mapped[int] = mapped_column(Integer, nullable=False)
     role: Mapped[str] = mapped_column(String(MESSAGE_ROLE_LENGTH), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    citations: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    citations: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        DateTime,
         nullable=False,
+        default=_utcnow,
         server_default=func.now(),
     )
 
@@ -265,12 +260,14 @@ class AppState(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[dict[str, Any]] = mapped_column(
-        JSONB,
+        JSON,
         nullable=False,
-        server_default=expression.text("'{}'::jsonb"),
+        default=dict,
+        server_default="{}",
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        DateTime,
         nullable=False,
+        default=_utcnow,
         server_default=func.now(),
     )
