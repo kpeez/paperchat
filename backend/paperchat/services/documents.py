@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
-from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -20,8 +19,8 @@ from paperchat.repositories import (
 
 @dataclass(frozen=True, slots=True)
 class IngestionJobRecord:
-    id: UUID
-    document_id: UUID
+    id: str
+    document_id: str
     attempt_number: int
     status: IngestionJobStatus
     stage: str | None = None
@@ -35,7 +34,7 @@ class IngestionJobRecord:
 
 @dataclass(frozen=True, slots=True)
 class DocumentRecord:
-    id: UUID
+    id: str
     content_hash: str
     original_filename: str
     display_name: str
@@ -57,14 +56,14 @@ class DocumentActionResult:
     job: IngestionJobRecord | None = None
 
     @property
-    def job_id(self) -> UUID | None:
+    def job_id(self) -> str | None:
         if self.job_enqueued and self.job is not None:
             return self.job.id
         return None
 
 
 class IngestionCoordinatorProtocol(Protocol):
-    def enqueue(self, job_id: UUID) -> None: ...
+    def enqueue(self, job_id: str) -> None: ...
 
 
 class DocumentLifecycleProtocol(Protocol):
@@ -72,11 +71,11 @@ class DocumentLifecycleProtocol(Protocol):
 
     def list_documents(self) -> tuple[DocumentRecord, ...]: ...
 
-    def get_document(self, *, document_id: UUID) -> DocumentRecord | None: ...
+    def get_document(self, *, document_id: str) -> DocumentRecord | None: ...
 
-    def retry_document(self, *, document_id: UUID) -> DocumentActionResult | None: ...
+    def retry_document(self, *, document_id: str) -> DocumentActionResult | None: ...
 
-    def delete_document(self, *, document_id: UUID) -> bool: ...
+    def delete_document(self, *, document_id: str) -> bool: ...
 
     def recover_interrupted_jobs(self) -> int: ...
 
@@ -127,7 +126,7 @@ class DocumentService:
             for document in self._registry.list_documents()
         )
 
-    def get_document(self, *, document_id: UUID) -> DocumentRecord | None:
+    def get_document(self, *, document_id: str) -> DocumentRecord | None:
         document = self._registry.get_document(document_id)
         if document is None:
             return None
@@ -136,7 +135,7 @@ class DocumentService:
             latest_job=self._registry.get_latest_job(document_id),
         )
 
-    def retry_document(self, *, document_id: UUID) -> DocumentActionResult | None:
+    def retry_document(self, *, document_id: str) -> DocumentActionResult | None:
         document = self._registry.get_document(document_id)
         if document is None:
             return None
@@ -161,7 +160,7 @@ class DocumentService:
         _enqueue_result(self._coordinator, result)
         return result
 
-    def delete_document(self, *, document_id: UUID) -> bool:
+    def delete_document(self, *, document_id: str) -> bool:
         document = self._registry.get_document(document_id)
         if document is None:
             return False
@@ -190,17 +189,17 @@ class DocumentLifecycleService:
     def list_documents(self) -> tuple[DocumentRecord, ...]:
         return self._backend.list_documents()
 
-    def get_document(self, *, document_id: UUID) -> DocumentRecord | None:
+    def get_document(self, *, document_id: str) -> DocumentRecord | None:
         return self._backend.get_document(document_id=document_id)
 
-    def retry_document(self, *, document_id: UUID) -> DocumentActionResult | None:
+    def retry_document(self, *, document_id: str) -> DocumentActionResult | None:
         result = self._backend.retry_document(document_id=document_id)
         if result is None:
             return None
         _enqueue_result(self._coordinator, result)
         return result
 
-    def delete_document(self, *, document_id: UUID) -> bool:
+    def delete_document(self, *, document_id: str) -> bool:
         return self._backend.delete_document(document_id=document_id)
 
     def recover_interrupted_jobs(self) -> int:
@@ -255,7 +254,7 @@ class DocumentLifecycleBackend:
                 for document in documents.list_all()
             )
 
-    def get_document(self, *, document_id: UUID) -> DocumentRecord | None:
+    def get_document(self, *, document_id: str) -> DocumentRecord | None:
         with self._session_factory() as session:
             documents = DocumentRepository(session)
             document = documents.get(document_id)
@@ -264,7 +263,7 @@ class DocumentLifecycleBackend:
             latest_job = IngestionJobRepository(session).get_latest_for_document(document_id)
             return _to_document_record(document, latest_job=latest_job)
 
-    def retry_document(self, *, document_id: UUID) -> DocumentActionResult | None:
+    def retry_document(self, *, document_id: str) -> DocumentActionResult | None:
         with self._session_factory.begin() as session:
             documents = DocumentRepository(session)
             jobs = IngestionJobRepository(session)
@@ -300,7 +299,7 @@ class DocumentLifecycleBackend:
                 job=_to_job_record(job),
             )
 
-    def delete_document(self, *, document_id: UUID) -> bool:
+    def delete_document(self, *, document_id: str) -> bool:
         with self._session_factory.begin() as session:
             documents = DocumentRepository(session)
             document = documents.get(document_id)
@@ -389,7 +388,7 @@ def _to_action_result(
     )
 
 
-def _create_queued_job(jobs: IngestionJobRepository, document_id: UUID) -> IngestionJob:
+def _create_queued_job(jobs: IngestionJobRepository, document_id: str) -> IngestionJob:
     return jobs.add(
         IngestionJob(
             document_id=document_id,

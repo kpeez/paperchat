@@ -8,7 +8,6 @@ from paperchat.db.schema import (
     DocumentChunk,
     IngestionJob,
     Message,
-    Vector,
 )
 
 __all__ = [
@@ -19,5 +18,4 @@ __all__ = [
     "DocumentChunk",
     "IngestionJob",
     "Message",
-    "Vector",
 ]
