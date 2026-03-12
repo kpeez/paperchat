@@ -10,6 +10,8 @@ from typing import Any, Protocol
 from paperchat.config import get_embedding_model_name, get_model_cache_dir
 
 DEFAULT_EMBEDDING_MODEL = "hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf"
+EMBEDDING_BATCH_SIZE = 32
+MAX_EMBEDDING_TEXT_LENGTH = 4000
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 EMBEDDING_RUNTIME_DIR = BACKEND_ROOT / "embedding_runtime"
 EMBEDDING_RUNTIME_SCRIPT = EMBEDDING_RUNTIME_DIR / "embedder.mjs"
@@ -81,6 +83,27 @@ def _embed_with_node_runtime(
         raise EmbeddingDependencyError(msg)
 
     _ensure_node_runtime_dependencies()
+    vectors: list[tuple[float, ...]] = []
+    for start in range(0, len(texts), EMBEDDING_BATCH_SIZE):
+        batch = texts[start : start + EMBEDDING_BATCH_SIZE]
+        vectors.extend(
+            _embed_batch_with_node_runtime(
+                node_binary=node_binary,
+                texts=batch,
+                model_name=model_name,
+                model_cache_dir=model_cache_dir,
+            )
+        )
+    return tuple(vectors)
+
+
+def _embed_batch_with_node_runtime(
+    *,
+    node_binary: str,
+    texts: Sequence[str],
+    model_name: str,
+    model_cache_dir: Path,
+) -> tuple[tuple[float, ...], ...]:
     request = json.dumps(
         {
             "model": model_name,
@@ -146,11 +169,15 @@ def _ensure_model_cache_dir() -> Path:
 
 
 def _format_query_for_embedding(query: str) -> str:
-    return f"task: search result | query: {query}"
+    return _truncate_embedding_text(f"task: search result | query: {query}")
 
 
 def _format_document_for_embedding(text: str) -> str:
-    return f"title: none | text: {text}"
+    return _truncate_embedding_text(f"title: none | text: {text}")
+
+
+def _truncate_embedding_text(text: str) -> str:
+    return text[:MAX_EMBEDDING_TEXT_LENGTH]
 
 
 def _model_load_error_message(model_name: str, error: Exception) -> str:

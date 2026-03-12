@@ -74,7 +74,13 @@ def _to_mutation_response(result: DocumentActionResult) -> DocumentMutationRespo
 @router.post("/import", response_model=DocumentMutationResponse)
 def import_document(payload: DocumentImportRequest, request: Request) -> DocumentMutationResponse:
     service = _get_document_service(request)
-    result = service.import_document(file_path=Path(payload.file_path))
+    try:
+        result = service.import_document(file_path=Path(payload.file_path))
+    except FileNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
     return _to_mutation_response(result)
 
 

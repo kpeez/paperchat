@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-import os
 from logging.config import fileConfig
+from pathlib import Path
 
 import sqlite_vec
 from sqlalchemy import engine_from_config, event, pool
+from sqlalchemy.engine import make_url
 
 from alembic import context
+from paperchat.config import get_database_url
 from paperchat.db.schema import Base
 
 config = context.config
@@ -20,15 +22,7 @@ target_metadata = Base.metadata
 
 
 def _database_url() -> str:
-    database_url = os.environ.get(
-        "PAPERCHAT_DATABASE_URL",
-        config.get_main_option("sqlalchemy.url"),
-    )
-    if database_url is None:
-        msg = "sqlalchemy.url must be configured for Alembic migrations."
-        raise RuntimeError(msg)
-
-    return database_url
+    return get_database_url()
 
 
 def _configure_sqlite_connection(dbapi_conn, _connection_record):
@@ -36,6 +30,18 @@ def _configure_sqlite_connection(dbapi_conn, _connection_record):
     dbapi_conn.enable_load_extension(True)
     sqlite_vec.load(dbapi_conn)
     dbapi_conn.enable_load_extension(False)
+
+
+def _ensure_sqlite_parent_dir(database_url: str) -> None:
+    url = make_url(database_url)
+    if url.get_backend_name() != "sqlite":
+        return
+
+    database = url.database
+    if database in {None, "", ":memory:"}:
+        return
+
+    Path(database).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
 
 
 def run_migrations_offline() -> None:
@@ -56,7 +62,9 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run migrations using a live database connection."""
     configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = _database_url()
+    database_url = _database_url()
+    configuration["sqlalchemy.url"] = database_url
+    _ensure_sqlite_parent_dir(database_url)
 
     connectable = engine_from_config(
         configuration,
