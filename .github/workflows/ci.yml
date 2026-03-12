@@ -11,6 +11,33 @@ permissions:
   contents: read
 
 jobs:
+  launcher:
+    name: Launcher
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@v6
+
+      - name: Set Up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install Launcher Dependencies
+        run: uv sync --group dev
+
+      - name: Lint Launcher
+        run: uv run ruff check paperchat_cli tests
+
+      - name: Check Launcher Formatting
+        run: uv run ruff format --check paperchat_cli tests
+
+      - name: Test Launcher
+        run: uv run pytest tests/test_launcher.py
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
@@ -49,7 +76,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      PAPERCHAT_DATABASE_URL: postgresql+psycopg://paperchat:paperchat@127.0.0.1:5433/paperchat
+      PAPERCHAT_DB_PATH: ${{ runner.temp }}/paperchat.db
+      PAPERCHAT_CACHE_DIR: ${{ runner.temp }}/paperchat-cache
 
     steps:
       - name: Check Out Repository
@@ -64,12 +92,6 @@ jobs:
       - name: Install Backend Dependencies
         working-directory: backend
         run: uv sync --locked --group dev
-
-      - name: Validate Compose Configuration
-        run: docker compose -f compose.yaml config
-
-      - name: Start Local Postgres Runtime
-        run: ./scripts/postgres-up.sh
 
       - name: Apply Backend Migrations
         working-directory: backend
@@ -90,11 +112,3 @@ jobs:
       - name: Test Backend
         working-directory: backend
         run: uv run pytest
-
-      - name: Show Postgres Logs On Failure
-        if: failure()
-        run: docker compose -f compose.yaml logs postgres
-
-      - name: Stop Local Postgres Runtime
-        if: always()
-        run: docker compose -f compose.yaml down -v

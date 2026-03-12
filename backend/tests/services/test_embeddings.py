@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -10,6 +11,8 @@ import paperchat.services.embeddings as embedding_module
 from paperchat import config as paperchat_config
 from paperchat.services.embeddings import (
     DEFAULT_EMBEDDING_MODEL,
+    EMBEDDING_BATCH_SIZE,
+    MAX_EMBEDDING_TEXT_LENGTH,
     EmbeddingDependencyError,
     EmbeddingGemmaEmbedder,
     EmbeddingRuntimeError,
@@ -54,6 +57,29 @@ def test_embedding_gemma_embedder_uses_qmd_prompt_format_and_model_cache() -> No
         "model_name": DEFAULT_EMBEDDING_MODEL,
         "model_cache_dir": str(paperchat_config.get_model_cache_dir()),
     }
+
+
+def test_embedding_gemma_embedder_truncates_long_inputs() -> None:
+    calls: list[tuple[str, ...]] = []
+
+    def fake_runner(texts, model_name: str, model_cache_dir: Path):
+        assert model_name == DEFAULT_EMBEDDING_MODEL
+        assert model_cache_dir == paperchat_config.get_model_cache_dir()
+        calls.append(texts)
+        return ((0.1, 0.2),)
+
+    embedder = EmbeddingGemmaEmbedder(embed_runner=fake_runner)
+    long_text = "x" * (MAX_EMBEDDING_TEXT_LENGTH * 2)
+
+    embedder.embed_documents((long_text,))
+    embedder.embed_query(long_text)
+
+    document_text = calls[0][0]
+    query_text = calls[1][0]
+    assert len(document_text) == MAX_EMBEDDING_TEXT_LENGTH
+    assert document_text.startswith("title: none | text: ")
+    assert len(query_text) == MAX_EMBEDDING_TEXT_LENGTH
+    assert query_text.startswith("task: search result | query: ")
 
 
 def test_embedding_gemma_embedder_uses_paperchat_model_cache(
@@ -168,6 +194,39 @@ def test_embed_with_node_runtime_parses_json_after_download_progress(
         DEFAULT_EMBEDDING_MODEL,
         tmp_path / "models",
     ) == ((0.1, 0.2),)
+
+
+def test_embed_with_node_runtime_batches_large_requests(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr("paperchat.services.embeddings.shutil.which", lambda _: "/usr/bin/node")
+    monkeypatch.setattr(
+        "paperchat.services.embeddings._ensure_node_runtime_dependencies", lambda: None
+    )
+    requests: list[list[str]] = []
+
+    def fake_run(*args, **kwargs):
+        payload = json.loads(kwargs["input"])
+        texts = payload["texts"]
+        requests.append(texts)
+        vectors = [[float(index)] for index in range(len(texts))]
+        return SimpleNamespace(returncode=0, stdout=json.dumps({"vectors": vectors}), stderr="")
+
+    monkeypatch.setattr("paperchat.services.embeddings.subprocess.run", fake_run)
+
+    total = EMBEDDING_BATCH_SIZE * 2 + 1
+    texts = tuple(f"title: none | text: {index}" for index in range(total))
+
+    vectors = _embed_with_node_runtime(texts, DEFAULT_EMBEDDING_MODEL, tmp_path / "models")
+
+    assert len(requests) == 3
+    assert [len(batch) for batch in requests] == [
+        EMBEDDING_BATCH_SIZE,
+        EMBEDDING_BATCH_SIZE,
+        1,
+    ]
+    assert len(vectors) == total
 
 
 def test_ensure_node_runtime_dependencies_installs_helper_when_missing(

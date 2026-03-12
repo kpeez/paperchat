@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from paperchat.api.bootstrap import router
 from paperchat.api.documents import router as documents_router
+from paperchat.api.local_files import router as local_files_router
+from paperchat.api.runtime import router as runtime_router
 from paperchat.db.engine import get_session_factory
 from paperchat.services.docling_ingestion import DoclingDocumentParser
 from paperchat.services.documents import (
@@ -61,6 +63,8 @@ def create_app(
     )
     app.include_router(router)
     app.include_router(documents_router)
+    app.include_router(local_files_router)
+    app.include_router(runtime_router)
     return app
 
 

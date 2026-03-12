@@ -90,6 +90,11 @@ class FakeDocumentService:
         return 1
 
 
+class MissingPathDocumentService(FakeDocumentService):
+    def import_document(self, *, file_path: Path) -> DocumentActionResult:
+        raise FileNotFoundError(f"Document path does not exist: {file_path}")
+
+
 def test_document_routes_cover_import_duplicate_retry_delete_and_lifespan_recovery() -> None:
     service = FakeDocumentService()
     app = create_app(document_service=service)
@@ -149,3 +154,13 @@ def test_retry_document_returns_404_for_unknown_document() -> None:
         response = client.post(f"/api/documents/{uuid4()}/retry")
 
     assert response.status_code == 404
+
+
+def test_import_document_returns_400_for_missing_path() -> None:
+    app = create_app(document_service=MissingPathDocumentService())
+
+    with TestClient(app) as client:
+        response = client.post("/api/documents/import", json={"file_path": "/tmp/missing.pdf"})
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Document path does not exist: /tmp/missing.pdf"}
