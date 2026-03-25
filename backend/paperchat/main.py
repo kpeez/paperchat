@@ -7,10 +7,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from paperchat.api.bootstrap import router
+from paperchat.api.chat import router as chat_router
 from paperchat.api.documents import router as documents_router
 from paperchat.api.local_files import router as local_files_router
 from paperchat.api.runtime import router as runtime_router
 from paperchat.db.engine import get_session_factory
+from paperchat.services.chat import ChatService, ChatServiceProtocol
 from paperchat.services.docling_ingestion import DoclingDocumentParser
 from paperchat.services.documents import (
     DocumentLifecycleBackend,
@@ -24,12 +26,15 @@ from paperchat.services.ingestion import IngestionCoordinator, IngestionProcesso
 def create_app(
     *,
     document_service: DocumentServiceProtocol | None = None,
+    chat_service: ChatServiceProtocol | None = None,
     start_worker: bool = True,
 ) -> FastAPI:
     service_was_injected = document_service is not None
     coordinator: IngestionCoordinator | None = None
     if document_service is None:
         document_service, coordinator = _build_default_document_service()
+    if chat_service is None:
+        chat_service = _build_default_chat_service()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -44,6 +49,7 @@ def create_app(
                 active_document_service = None
                 active_coordinator = None
         app.state.document_service = active_document_service
+        app.state.chat_service = chat_service
         app.state.ingestion_coordinator = active_coordinator
         if active_coordinator is not None and start_worker:
             active_coordinator.start()
@@ -56,12 +62,13 @@ def create_app(
     app = FastAPI(lifespan=lifespan)
     app.add_middleware(
         cast(Any, CORSMiddleware),
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
     app.include_router(router)
+    app.include_router(chat_router)
     app.include_router(documents_router)
     app.include_router(local_files_router)
     app.include_router(runtime_router)
@@ -94,3 +101,10 @@ def _build_default_document_service() -> tuple[
         ),
         coordinator,
     )
+
+
+def _build_default_chat_service() -> ChatServiceProtocol | None:
+    try:
+        return ChatService(session_factory=get_session_factory())
+    except Exception:
+        return None

@@ -32,7 +32,7 @@ export function BootstrapPage() {
         if (cancelled) return;
 
         if (data.status === "ready") {
-          navigate("/app", { state: { version: data.app_version } });
+          navigate("/app/library", { state: { version: data.app_version } });
         } else {
           setBootstrap(data);
           if (data.errors.length > 0) {

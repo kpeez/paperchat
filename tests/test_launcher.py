@@ -113,7 +113,7 @@ def test_launch_uses_configured_backend_port_for_probe_and_frontend_api_url(
     assert process_calls == [
         (["/usr/bin/uv", "run", "paperchat-backend"], backend, None),
         (
-            ["/usr/bin/vite", "--host", "127.0.0.1", "--port", "5173"],
+            ["/usr/bin/vite", "--host", "127.0.0.1", "--port", "5173", "--strictPort"],
             frontend,
             {"VITE_API_URL": "http://127.0.0.1:9812"},
         ),
