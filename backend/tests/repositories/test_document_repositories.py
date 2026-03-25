@@ -5,6 +5,7 @@ from paperchat.repositories.documents import (
     DocumentRepository,
     IngestionJobRepository,
     NewChunk,
+    VectorChunkRepository,
 )
 
 VALID_CONTENT_HASH = "a" * 64
@@ -114,3 +115,59 @@ def test_delete_document_hard_deletes_related_chunks_and_jobs(db_session) -> Non
     assert document_repository.get(document.id) is None
     assert chunk_repository.list_for_document(document.id) == ()
     assert job_repository.get_latest_for_document(document.id) is None
+
+
+def test_vector_chunk_repository_searches_ready_documents(db_session) -> None:
+    document_repository = DocumentRepository(db_session)
+    chunk_repository = DocumentChunkRepository(db_session)
+
+    first = document_repository.create(
+        content_hash="b" * 64,
+        original_filename="attention.pdf",
+        display_name="Attention",
+        file_path="/tmp/attention.pdf",
+        status="ready",
+    )
+    second = document_repository.create(
+        content_hash="c" * 64,
+        original_filename="bert.pdf",
+        display_name="BERT",
+        file_path="/tmp/bert.pdf",
+        status="ready",
+    )
+    chunk_repository.replace_for_document(
+        first.id,
+        (
+            NewChunk(
+                chunk_index=0,
+                text="attention text",
+                retrieval_text="attention text",
+                page_numbers=(1,),
+                headings=("Overview",),
+                warning_codes=(),
+                embedding=(1.0, 0.0),
+            ),
+        ),
+    )
+    chunk_repository.replace_for_document(
+        second.id,
+        (
+            NewChunk(
+                chunk_index=0,
+                text="bert text",
+                retrieval_text="bert text",
+                page_numbers=(2,),
+                headings=("Methods",),
+                warning_codes=(),
+                embedding=(0.0, 1.0),
+            ),
+        ),
+    )
+
+    results = VectorChunkRepository(db_session).search(
+        query_embedding=(1.0, 0.0),
+        document_ids=(first.id, second.id),
+        limit=2,
+    )
+
+    assert [result.document_id for result in results] == [first.id, second.id]
