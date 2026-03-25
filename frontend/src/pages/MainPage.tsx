@@ -1,11 +1,10 @@
 import {
   startTransition,
-  useCallback,
   useEffect,
   useState,
   type FormEvent,
 } from "react";
-import { useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 import { ApiError } from "../api/client";
 import {
   deleteDocument,
@@ -17,6 +16,7 @@ import {
 } from "../api/documents";
 import { pickDocuments } from "../api/localFiles";
 import { fetchRuntime, type RuntimeResponse } from "../api/runtime";
+import { ProductNav } from "../components/ProductNav";
 
 type NoticeTone = "success" | "warning" | "error";
 
@@ -39,7 +39,7 @@ export function MainPage() {
   const [addingDocuments, setAddingDocuments] = useState(false);
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
 
-  const loadRuntime = useCallback(async () => {
+  async function loadRuntime() {
     try {
       const data = await fetchRuntime();
       startTransition(() => {
@@ -51,9 +51,9 @@ export function MainPage() {
         message: toErrorMessage(error),
       });
     }
-  }, []);
+  }
 
-  const loadDocuments = useCallback(async (silent = false) => {
+  async function loadDocuments(silent = false) {
     if (!silent) {
       setLoading(true);
     }
@@ -75,48 +75,45 @@ export function MainPage() {
         setLoading(false);
       }
     }
-  }, []);
+  }
 
-  const importPaths = useCallback(
-    async (paths: string[]) => {
-      if (paths.length === 0) {
-        return;
+  async function importPaths(paths: string[]) {
+    if (paths.length === 0) {
+      return;
+    }
+
+    const outcome = {
+      queued: 0,
+      duplicates: 0,
+      failedDuplicates: 0,
+    };
+
+    for (const path of paths) {
+      const result = await importDocument(path);
+      if (result.job_enqueued) {
+        outcome.queued += 1;
+        continue;
       }
 
-      const outcome = {
-        queued: 0,
-        duplicates: 0,
-        failedDuplicates: 0,
-      };
-
-      for (const path of paths) {
-        const result = await importDocument(path);
-        if (result.job_enqueued) {
-          outcome.queued += 1;
-          continue;
-        }
-
-        if (result.document.status === "failed") {
-          outcome.failedDuplicates += 1;
-        } else {
-          outcome.duplicates += 1;
-        }
+      if (result.document.status === "failed") {
+        outcome.failedDuplicates += 1;
+      } else {
+        outcome.duplicates += 1;
       }
+    }
 
-      await loadDocuments(true);
-      setNotice({
-        tone:
-          outcome.failedDuplicates > 0 || outcome.duplicates > 0 ? "warning" : "success",
-        message: summarizeImportOutcome(outcome),
-      });
-    },
-    [loadDocuments],
-  );
+    await loadDocuments(true);
+    setNotice({
+      tone:
+        outcome.failedDuplicates > 0 || outcome.duplicates > 0 ? "warning" : "success",
+      message: summarizeImportOutcome(outcome),
+    });
+  }
 
   useEffect(() => {
     void loadRuntime();
     void loadDocuments();
-  }, [loadDocuments, loadRuntime]);
+  }, []);
 
   const shouldPoll = documents.some((document) =>
     ACTIVE_STATUSES.includes(document.status),
@@ -134,7 +131,7 @@ export function MainPage() {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [loadDocuments, shouldPoll]);
+  }, [shouldPoll]);
 
   async function handlePickDocuments() {
     setAddingDocuments(true);
@@ -244,10 +241,10 @@ export function MainPage() {
         <header className="rounded-[2rem] border border-white/70 bg-white/80 px-6 py-6 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.55)] backdrop-blur">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.32em] text-teal-700">
-                Local Research Library
-              </p>
               <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-teal-700">
+                  Local Research Library
+                </p>
                 <h1
                   className="text-3xl font-semibold tracking-tight text-slate-950 lg:text-4xl"
                   style={{ fontFamily: '"Iowan Old Style", "Palatino Linotype", Georgia, serif' }}
@@ -259,6 +256,7 @@ export function MainPage() {
                   chat ever starts guessing.
                 </p>
               </div>
+              <ProductNav />
             </div>
 
             <div className="grid grid-cols-3 gap-3 text-sm">
@@ -298,6 +296,15 @@ export function MainPage() {
                   {addingDocuments ? "Working..." : "Choose PDFs"}
                 </button>
               </div>
+
+              {readyCount > 0 && (
+                <Link
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-teal-300 hover:text-teal-700 xl:self-start"
+                  to="/app/chat"
+                >
+                  Open grounded chat
+                </Link>
+              )}
 
               <form className="grid gap-3 md:grid-cols-[1fr_auto]" onSubmit={handleManualImport}>
                 <label className="space-y-2">
