@@ -52,7 +52,7 @@ def launch(*, no_open: bool) -> None:
         wait_for_url(f"{backend_url}/api/health", backend_process, label="backend")
 
         frontend_process = start_process(
-            [vite_command, "--host", HOST, "--port", str(FRONTEND_PORT)],
+            [vite_command, "--host", HOST, "--port", str(FRONTEND_PORT), "--strictPort"],
             cwd=paths.frontend,
             env_overrides={"VITE_API_URL": backend_url},
         )
